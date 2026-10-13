@@ -226,7 +226,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 
   <section class="log"><h2>Recent sessions</h2><ul id="log"></ul></section>
   </div>
-  <p class="ver">Round Clock · updated 13 Oct 2026 · Coach Carl</p>
+  <p class="ver">Round Clock · updated 13 Oct 2026 · Coach Carl 2</p>
 </main>
 
 <!-- RUN -->
@@ -388,7 +388,7 @@ $('voicePick').addEventListener('change',e=>{S.voiceName=e.target.value;render()
 $('voiceTest').addEventListener('click',()=>{mediaMode();loadClips().then(()=>speakCombo(['one','two','three','slip','two'],true))});
 /* recorded coach voice: same English voice on every phone */
 const CLIPS={carl:{},ryan:{},lessac:{}},CLIPW=['one','two','three','four','five','six','slip','roll','pivot'],clipsP={};
-const CLIPDIR={carl:'audio/v4/carl/',ryan:'audio/v3/ryan/',lessac:'audio/v3/lessac/'};
+const CLIPDIR={carl:'audio/v5/carl/',ryan:'audio/v3/ryan/',lessac:'audio/v3/lessac/'};
 const coachVoice=()=>!S.voiceName?'carl':S.voiceName==='clip:ryan'?'ryan':S.voiceName==='clip:lessac'?'lessac':null;
 function loadClips(){
   const c=coachVoice();if(!c)return Promise.resolve();
