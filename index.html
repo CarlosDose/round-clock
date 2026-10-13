@@ -134,6 +134,13 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 .bar div{height:100%;width:0;background:var(--text)}
 .ctrls{display:grid;grid-template-columns:1fr 2fr 1fr;gap:10px}
 .ctrls button{border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.25);border-radius:8px;padding:16px 8px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;font-size:.9rem}
+.ctrls .hold{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;gap:2px;-webkit-user-select:none;user-select:none;touch-action:none}
+.ctrls .hold small{font-size:.65rem;opacity:.6;letter-spacing:.08em}
+.ctrls .hold i{position:absolute;left:0;bottom:0;height:4px;width:0;background:var(--amber)}
+.ctrls .hold.holding i{width:100%;transition:width .8s linear}
+#run.paused .clock{opacity:.35}
+#run.paused .phase::after{content:' · paused';color:var(--muted)}
+.tap-hint{text-align:center;font-size:.75rem;color:var(--muted);margin-top:8px;letter-spacing:.06em;text-transform:uppercase}
 .ctrls #pause{font-family:var(--display);font-weight:900;font-size:1.6rem;background:var(--text);color:var(--ground);border:0}
 .confirm{display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:10px}
 .confirm button{border:1px solid rgba(255,255,255,.25);background:none;border-radius:6px;padding:10px 16px}
@@ -214,6 +221,9 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 .d-steps,.d-miss{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:8px;line-height:1.45}
 .d-steps li::marker{color:var(--amber);font-weight:700}
 .d-miss li::marker{color:var(--red)}
+.bk-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.bk-row .ghost{padding:12px 8px}
+.bk-file{font:inherit;color:var(--muted);max-width:100%}
 .prog{display:flex;flex-direction:column;gap:18px}
 .p-hero{display:flex;flex-direction:column;gap:6px}
 .p-big{font-family:var(--display);font-weight:900;font-size:clamp(3rem,14vw,4.2rem);line-height:.9;font-variant-numeric:tabular-nums}
@@ -315,7 +325,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
     <div id="progBody" class="prog"></div>
   </div>
   <button type="button" class="link" id="tourLink">How Round Clock works</button>
-  <p class="ver">Round Clock · updated 13 Oct 2026 · drills</p>
+  <p class="ver">Round Clock · updated 13 Oct 2026 · gloves + backup</p>
 </main>
 
 <!-- RUN -->
@@ -327,10 +337,11 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
   <div class="next" id="next"></div>
   <div class="bar"><div id="bar"></div></div>
   <div class="ctrls" id="ctrls">
-    <button id="stop">Stop</button>
+    <button id="stop" class="hold"><span>Stop</span><small>hold</small><i></i></button>
     <button id="pause">Pause</button>
-    <button id="skip">Skip</button>
+    <button id="skip" class="hold"><span>Skip</span><small>hold</small><i></i></button>
   </div>
+  <p class="tap-hint">Tap anywhere to pause · hold to skip or stop</p>
   <div class="confirm" id="confirm" hidden>
     <span>End the session?</span><button class="yes" id="yesStop">End</button><button id="noStop">Keep going</button>
   </div>
@@ -876,6 +887,45 @@ function openDrill(id){
   document.body.appendChild(sh);
 }
 
+/* ---------- backup ---------- */
+const BK_KEYS=['rc-log','rc-profile','rc-settings','rc-today','rc-cfocus','rc-tour'];
+function backupCode(){const data={};BK_KEYS.forEach(k=>{const v=store.get(k);if(v!=null)data[k]=v});
+  return 'RC1.'+btoa(unescape(encodeURIComponent(JSON.stringify({app:'round-clock',t:Date.now(),data}))))}
+function readBackup(code){try{code=String(code||'').trim().replace(/\s+/g,'');if(code.startsWith('RC1.'))code=code.slice(4);
+  const o=JSON.parse(decodeURIComponent(escape(atob(code))));return o&&o.app==='round-clock'&&o.data?o:null}catch(e){return null}}
+function backupBlock(el){
+  const b=el('div','t-block');b.append(el('div','t-label','Backup'),el('p','eq-note','Your training lives on this phone only. Save a backup now and then, so a new phone or cleared browser never loses your history.'));
+  const row=el('div','bk-row');
+  const cp=el('button','ghost','Copy backup code');cp.type='button';
+  cp.addEventListener('click',async()=>{const c=backupCode();try{await navigator.clipboard.writeText(c);cp.textContent='Copied. Paste it in your notes'}catch(e){openRestore(c)}});
+  const dl=el('button','ghost','Save backup file');dl.type='button';
+  dl.addEventListener('click',()=>{try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([backupCode()],{type:'text/plain'}));
+    a.download='round-clock-backup-'+new Date().toISOString().slice(0,10)+'.txt';document.body.appendChild(a);a.click();a.remove()}catch(e){openRestore(backupCode())}});
+  const rs=el('button','link','Restore from a backup');rs.type='button';rs.addEventListener('click',()=>openRestore());
+  row.append(cp,dl);b.append(row,rs);return b;
+}
+function openRestore(showCode){
+  const el=(t,c,txt)=>{const e=document.createElement(t);if(c)e.className=c;if(txt!=null)e.textContent=txt;return e};
+  let sh=$('bkSheet');if(sh)sh.remove();sh=el('div','sheet');sh.id='bkSheet';sh.setAttribute('role','dialog');
+  const card=el('div','sheet-card');
+  if(showCode){card.append(el('div','eq-q','Your backup code'),el('p','eq-note','Select it all, copy it and keep it somewhere safe, like your notes.'));
+    const ta=el('textarea','edit-note');ta.rows=6;ta.readOnly=true;ta.value=showCode;card.appendChild(ta);setTimeout(()=>{ta.focus();ta.select()},50);
+  }else{
+    card.append(el('div','eq-q','Restore a backup'),el('p','eq-note','Paste your backup code, or pick a saved backup file. This replaces the training data on this phone.'));
+    const ta=el('textarea','edit-note');ta.rows=5;ta.placeholder='RC1.…';card.appendChild(ta);
+    const fi=el('input');fi.type='file';fi.accept='.txt,text/plain';fi.className='bk-file';
+    fi.addEventListener('change',()=>{const f=fi.files&&fi.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{ta.value=String(r.result||'')};r.readAsText(f)});
+    card.appendChild(fi);
+    const msg=el('p','eq-note');card.appendChild(msg);
+    const go=el('button','go','Restore');let armed=false;
+    go.addEventListener('click',()=>{const o=readBackup(ta.value);if(!o){msg.textContent='That doesn\'t look like a Round Clock backup. Check that you copied the whole code.';msg.style.color='var(--amber)';return}
+      if(!armed){armed=true;const n=(o.data['rc-log']||[]).length;go.textContent=`Tap again to restore ${n} session${n===1?'':'s'}`;return}
+      Object.keys(o.data).forEach(k=>{if(BK_KEYS.includes(k))store.set(k,o.data[k])});location.reload()});
+    card.appendChild(go);
+  }
+  const x=el('button','link','Close');x.type='button';x.addEventListener('click',()=>sh.remove());card.appendChild(x);
+  sh.appendChild(card);sh.addEventListener('click',e=>{if(e.target===sh)sh.remove()});document.body.appendChild(sh);
+}
 function refreshAll(){renderLog();renderPlan();if(!$('pProgress').hidden)renderProgress()}
 function openEdit(i){
   const L=store.get('rc-log')||[];const x=L[i];if(!x)return;
@@ -914,9 +964,9 @@ const TOUR=[
   {k:'Today',h:'Your coach plans every session',p:'Open the app and a full session is ready: warm-up, main rounds with one job each, a finisher and a cool-down.',
    b:['Tell it what you have today: heavy bag, jump rope','Pick a combo focus to drill, like body shots or defense','Press Start full session']},
   {k:'During',h:'Keep your gloves on',p:'Everything runs by itself from start to finish.',
-   b:['Bells start and end every round','Combos are called out loud and shown big','Clacks warn you before the bell (10 or 30 sec)','Every rest tells you what comes next']},
+   b:['Bells start and end every round','Combos are called out loud and shown big','Tap anywhere to pause. Hold Skip or Stop for a second','Clacks warn you before the bell (10 or 30 sec)']},
   {k:'After',h:'Four taps teach your coach',p:'Answer the check-in after each session.',
-   b:['Three easy sessions in a row: level up','Sore or tired: an easier day','Wrong answer or extra session? Tap it in Progress to fix it']},
+   b:['Three easy sessions in a row: level up','Sore or tired: an easier day','Wrong answer or extra session? Tap it in Progress to fix it','Save a backup now and then (bottom of Progress)']},
   {k:'More tabs',h:'Your tools',p:'Three more tabs at the top.',
    b:['Timer: your own rounds, end-of-round warnings, combo calls and coach voice','Drills: every move explained step by step. Tap any part of your session to open it','Progress: week goal, streak, effort over time and every level-up']}
 ];
@@ -947,7 +997,7 @@ function renderProgress(){
   if(!L.length){
     const e=el('p','t-empty','Your progress shows up here after your first finished session: your week goal, streak, training days, effort over time and every level-up.');
     const a=el('div','t-actions');const g=el('button','go','Go to today\'s plan');g.addEventListener('click',()=>tab('today'));a.appendChild(g);
-    box.append(e,a);return;
+    box.append(e,a,backupBlock(el));return;
   }
   const pr=profile()||{};const goal={low:2,mid:3,high:5}[pr.days]||3;
   const now=Date.now(),thisW=weekStart(now),lastW=thisW-7*864e5;
@@ -1001,7 +1051,7 @@ function renderProgress(){
     const r=el('span','p-up');r.appendChild(el('b',null,logLine(x)));r.appendChild(el('small',null,x.c&&x.c.rpe?'Effort '+x.c.rpe+'/10':'No check-in'));
     li.append(el('span',null,x.d),r);li.addEventListener('click',()=>openEdit(i));sl.appendChild(li)});
   ss.appendChild(sl);
-  box.append(hero,strip,stats,ch,ups,ss);
+  box.append(hero,strip,stats,ch,ups,ss,backupBlock(el));
 }
 $('tabToday').addEventListener('click',()=>tab('today'));
 $('tabTimer').addEventListener('click',()=>tab('timer'));
@@ -1159,12 +1209,25 @@ $('skipCheck').addEventListener('click',()=>{$('check').hidden=true});
 $('start').addEventListener('click',()=>start('timer'));
 $('again').addEventListener('click',()=>start(R.mode));
 $('back').addEventListener('click',()=>show('setup'));
-$('pause').addEventListener('click',()=>{
-  if(!R.paused){R.paused=true;R.left=R.end-performance.now();$('pause').textContent='Resume';unwake()}
+function togglePause(){
+  if(!R.on)return;
+  if(!R.paused){R.paused=true;R.left=R.end-performance.now();$('pause').textContent='Resume';unwake();try{speechSynthesis.cancel()}catch(e){}}
   else{R.paused=false;R.end=performance.now()+R.left;$('pause').textContent='Pause';wake();mediaMode();audio()}
-});
-$('skip').addEventListener('click',()=>{if(R.on){if(R.paused){R.paused=false;$('pause').textContent='Pause'}next()}});
-$('stop').addEventListener('click',()=>{$('ctrls').hidden=true;$('confirm').hidden=false});
+  $('run').classList.toggle('paused',R.paused);
+}
+$('pause').addEventListener('click',e=>{e.stopPropagation();togglePause()});
+// gloves-on: tap anywhere on the run screen to pause / resume
+$('run').addEventListener('click',e=>{if(e.target.closest('button'))return;togglePause()});
+// skip and stop need a short hold, so a glove brushing the screen can't trigger them
+function holdButton(btn,action){
+  let t=null;const cancel=()=>{clearTimeout(t);t=null;btn.classList.remove('holding')};
+  btn.addEventListener('pointerdown',e=>{e.preventDefault();btn.classList.add('holding');t=setTimeout(()=>{cancel();action()},800)});
+  ['pointerup','pointerleave','pointercancel'].forEach(ev=>btn.addEventListener(ev,cancel));
+  btn.addEventListener('click',e=>{e.stopPropagation();if(e.detail===0)action()}); // keyboard
+  btn.addEventListener('contextmenu',e=>e.preventDefault());
+}
+holdButton($('skip'),()=>{if(R.on){if(R.paused){R.paused=false;$('pause').textContent='Pause';$('run').classList.remove('paused')}next()}});
+holdButton($('stop'),()=>{if(R.on){$('run').classList.remove('paused');finish(false)}});
 $('noStop').addEventListener('click',()=>{$('confirm').hidden=true;$('ctrls').hidden=false});
 $('yesStop').addEventListener('click',()=>{const ph=R.list[R.i];finish(false)});
 
