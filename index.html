@@ -226,7 +226,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 
   <section class="log"><h2>Recent sessions</h2><ul id="log"></ul></section>
   </div>
-  <p class="ver">Round Clock · updated 13 Oct 2026 · Coach Carl 2</p>
+  <p class="ver">Round Clock · updated 13 Oct 2026 · Coach Carl 3</p>
 </main>
 
 <!-- RUN -->
@@ -393,7 +393,7 @@ const coachVoice=()=>!S.voiceName?'carl':S.voiceName==='clip:ryan'?'ryan':S.voic
 function loadClips(){
   const c=coachVoice();if(!c)return Promise.resolve();
   if(clipsP[c])return clipsP[c];const a=audio();if(!a||!window.fetch)return Promise.resolve();
-  clipsP[c]=Promise.all(CLIPW.map(w=>fetch(CLIPDIR[c]+w+'.mp3').then(r=>{if(!r.ok)throw 0;return r.arrayBuffer()})
+  clipsP[c]=Promise.all(CLIPW.map(w=>fetch(CLIPDIR[c]+w+'.mp3?v=3').then(r=>{if(!r.ok)throw 0;return r.arrayBuffer()})
     .then(b=>new Promise((res,rej)=>a.decodeAudioData(b,res,rej))).then(buf=>{CLIPS[c][w]=buf}).catch(()=>{})));
   return clipsP[c];
 }
