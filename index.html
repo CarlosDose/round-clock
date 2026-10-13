@@ -170,6 +170,18 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 .lvl p{margin:0;color:var(--muted)}
 @keyframes lvlpop{0%{transform:scale(.85);opacity:0}70%{transform:scale(1.04);opacity:1}100%{transform:scale(1)}}
 @media (prefers-reduced-motion:reduce){.lvl{animation:none}}
+.eqbox{border-color:var(--text)}
+.eq-q{font-family:var(--display);font-weight:800;font-size:1.7rem;line-height:1.05;text-transform:uppercase;letter-spacing:.02em}
+.eq-tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.eq-tile{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:14px;border-radius:10px;border:2px solid var(--line);background:var(--ground);text-align:left;min-width:0}
+.eq-tile b{font-family:var(--display);font-weight:800;font-size:1.35rem;text-transform:uppercase;letter-spacing:.03em}
+.eq-tile span{font-size:.9rem;color:var(--muted);font-weight:600}
+.eq-tile[aria-pressed="true"]{border-color:var(--green)}
+.eq-tile[aria-pressed="true"] span{color:var(--green)}
+.eq-tile[aria-pressed="false"] b{color:var(--muted);text-decoration:line-through}
+.eq-note{margin:0;font-size:.92rem;color:var(--muted);line-height:1.45}
+.sheet{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center;padding:16px}
+.sheet-card{width:100%;max-width:460px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 16px calc(20px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px;animation:lvlpop .3s ease-out}
 .prog{display:flex;flex-direction:column;gap:18px}
 .p-hero{display:flex;flex-direction:column;gap:6px}
 .p-big{font-family:var(--display);font-weight:900;font-size:clamp(3rem,14vw,4.2rem);line-height:.9;font-variant-numeric:tabular-nums}
@@ -266,7 +278,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
   <div class="panel" id="pProgress" role="tabpanel" aria-labelledby="tabProgress" hidden>
     <div id="progBody" class="prog"></div>
   </div>
-  <p class="ver">Round Clock · updated 13 Oct 2026 · warnings</p>
+  <p class="ver">Round Clock · updated 13 Oct 2026 · equipment</p>
 </main>
 
 <!-- RUN -->
@@ -396,6 +408,32 @@ function todayEq(){
   const pl=places();return {bag:pl.length?pl.some(p=>p!=='home'):true,rope:true};
 }
 function setEq(eq){store.set('rc-today',{d:new Date().toDateString(),eq})}
+const eqConfirmed=()=>{const t=store.get('rc-today');return !!(t&&t.d===new Date().toDateString())};
+function eqTiles(onChange){
+  const eq=todayEq(),wrap=document.createElement('div');wrap.className='eq-tiles';
+  [['bag','Heavy bag'],['rope','Jump rope']].forEach(([k,l])=>{
+    const b=document.createElement('button');b.type='button';b.className='eq-tile';b.setAttribute('aria-pressed',!!eq[k]);
+    const n=document.createElement('b');n.textContent=l;const st=document.createElement('span');st.textContent=eq[k]?'✓ Using it':'Not today';
+    b.append(n,st);
+    b.addEventListener('click',()=>{const e=todayEq();e[k]=!e[k];setEq(e);onChange()});
+    wrap.appendChild(b)});
+  return wrap;
+}
+function openEqSheet(){
+  let sh=$('eqSheet');if(sh)sh.remove();
+  sh=document.createElement('div');sh.id='eqSheet';sh.className='sheet';sh.setAttribute('role','dialog');sh.setAttribute('aria-label','What do you have today?');
+  const card=document.createElement('div');card.className='sheet-card';
+  const fill=()=>{card.innerHTML='';
+    const h=document.createElement('div');h.className='eq-q';h.textContent='What do you have today?';
+    const p=document.createElement('p');p.className='eq-note';p.textContent='Tap to switch on or off. Your session adapts before it starts.';
+    const go=document.createElement('button');go.className='go';go.textContent='Start session';
+    go.addEventListener('click',()=>{setEq(todayEq());sh.remove();renderPlan();start('plan')});
+    const x=document.createElement('button');x.className='link';x.type='button';x.textContent='Cancel';x.addEventListener('click',()=>{sh.remove()});
+    card.append(h,p,eqTiles(()=>{renderPlan();fill()}),go,x)};
+  fill();sh.appendChild(card);
+  sh.addEventListener('click',e=>{if(e.target===sh)sh.remove()});
+  document.body.appendChild(sh);
+}
 /* ---------- combo callouts ---------- */
 const PUNCH={'1':['one','jab'],'2':['two','cross'],'3':['three','hook'],'4':['four','rear hook'],'5':['five','uppercut'],'6':['six','rear uppercut']};
 const COMBOS={
@@ -541,12 +579,10 @@ function renderPlan(){
     const g=el('button','ghost','Go to timer');g.addEventListener('click',()=>tab('timer'));a.append(s,g);
     b.append(e,a);return}
   badge.textContent={up:'Level up',hold:'Hold',ease:'Easy day',start:'Starting plan'}[P.kind];badge.className='badge '+(P.kind==='start'?'hold':P.kind);
-  const eq=todayEq();
-  const q=el('div','t-eq');q.appendChild(el('div','t-label','What do you have today?'));
-  const ch=el('div','chips');
-  [['bag','Heavy bag'],['rope','Jump rope']].forEach(([k,l])=>{const bt=el('button',null,l);bt.type='button';
-    bt.setAttribute('aria-pressed',!!eq[k]);bt.addEventListener('click',()=>{const e=todayEq();e[k]=!e[k];setEq(e);renderPlan()});ch.appendChild(bt)});
-  q.appendChild(ch);
+  const q=el('div','t-block eqbox');
+  q.append(el('div','t-label','Before you start'),el('div','eq-q','What do you have today?'));
+  q.appendChild(eqTiles(renderPlan));
+  q.appendChild(el('p','eq-note','Your session changes to fit. No bag means shadowboxing or footwork instead. No rope means skipping on the spot.'));
   const m=el('div','t-main',`${Math.round(blocksTime(P.blocks)/60)} min`);
   m.appendChild(el('small',null,`Full session · ${blocksRounds(P.blocks)} rounds`));
   const list=el('ol','t-list');
@@ -558,7 +594,7 @@ function renderPlan(){
   const w=el('div','t-block');w.append(el('div','t-label','Why this plan'),el('p','t-why',P.why));
   const a=el('div','t-actions');
   const go=el('button','go','Start full session');
-  go.addEventListener('click',()=>start('plan'));
+  go.addEventListener('click',()=>eqConfirmed()?start('plan'):openEqSheet());
   const adj=el('button','ghost','Just the main rounds');
   adj.addEventListener('click',()=>{S.rounds=P.main.rounds;S.round=P.main.round;S.rest=P.main.rest;render();tab('timer')});
   a.append(go,adj);
