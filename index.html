@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#11100f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Round Clock">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
+<title>Round Clock</title>
+<style>*,*::before,*::after{box-sizing:border-box}[hidden]{display:none!important}body{margin:0}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: one-screen gym wall clock. Setup card → full-screen run view whose colour tells the phase from across the room. Deliberately single-theme (dark). */
+:root{
+  --ground:#11100f; --panel:#1b1917; --line:#2c2926; --text:#f3eee6; --muted:#9a9189;
+  --red:#e3382d; --green:#33b866; --amber:#f2a516;
+  --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+  --body:"Barlow","Helvetica Neue",Arial,sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--ground);color:var(--text);font-family:var(--body);font-size:16px;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+
+/* ---------- setup ---------- */
+#setup{max-width:460px;margin:0 auto;padding:20px 16px 32px;display:flex;flex-direction:column;gap:20px}
+.brand{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.brand h1{font-family:var(--display);font-weight:900;font-size:2.4rem;letter-spacing:.02em;text-transform:uppercase;margin:0;line-height:1}
+.brand h1 span{color:var(--red)}
+.brand small{color:var(--muted);font-size:.85rem}
+.tabs{display:grid;grid-template-columns:1fr 1fr;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px;gap:4px}
+.tabs button{background:none;border:0;border-radius:7px;padding:12px;font-family:var(--display);font-weight:800;font-size:1.3rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.tabs button[aria-selected="true"]{background:var(--text);color:var(--ground)}
+.panel{display:flex;flex-direction:column;gap:20px}
+.today{display:flex;flex-direction:column;gap:16px}
+.today-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.today h2{margin:0;font-size:.85rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:600}
+.badge{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:5px 12px;border-radius:999px;border:1.5px solid currentColor}
+.badge:empty{display:none}
+.badge.up{color:var(--red)}.badge.hold{color:var(--text)}.badge.ease{color:var(--green)}
+.t-body{display:flex;flex-direction:column;gap:16px}
+.t-main{font-family:var(--display);font-weight:900;font-size:clamp(3.2rem,15vw,4.4rem);line-height:.9;font-variant-numeric:tabular-nums}
+.t-main small{display:block;font-family:var(--body);font-weight:500;font-size:1.05rem;color:var(--muted);margin-top:8px;line-height:1.3}
+.t-block{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:6px}
+.t-label{font-size:.78rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:600}
+.t-focus{font-family:var(--display);font-weight:800;font-size:2rem;text-transform:uppercase;letter-spacing:.03em;line-height:1;color:var(--amber)}
+.t-tip{margin:0;font-size:1.15rem;line-height:1.45;font-weight:500}
+.t-why{margin:0;font-size:1.02rem;line-height:1.5;max-width:60ch}
+.t-actions{display:flex;flex-direction:column;gap:10px;margin-top:6px;padding-top:16px;border-top:1px solid var(--line)}
+.t-actions .go{width:100%}
+.onb-intro{margin:0;color:var(--muted);line-height:1.5}
+.onb-err{margin:0;color:var(--amber);font-weight:600}
+.hint{font-weight:400;color:var(--muted);font-size:.85rem;margin-left:4px}
+.t-eq{display:flex;flex-direction:column;gap:10px}
+.t-who{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:.9rem;color:var(--muted)}
+.t-who .link{font-size:.9rem}
+.t-empty{margin:0;font-size:1.05rem;line-height:1.5;color:var(--muted)}
+.presets{display:flex;gap:8px;flex-wrap:wrap}
+.presets button{flex:1 1 0;min-width:90px;background:none;border:1px solid var(--line);border-radius:6px;padding:8px 6px;font-size:.85rem;color:var(--muted)}
+.presets button b{display:block;color:var(--text);font-family:var(--display);font-size:1.15rem;font-weight:800;letter-spacing:.03em}
+.presets button[aria-pressed="true"]{border-color:var(--red)}
+.rows{display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--line)}
+.row label{font-weight:600;text-transform:uppercase;letter-spacing:.08em;font-size:.8rem;color:var(--muted)}
+.row label em{display:block;font-style:normal;text-transform:none;letter-spacing:0;font-weight:400;font-size:.8rem;color:#6f6861}
+.step{display:flex;align-items:center;gap:6px}
+.step button{width:48px;height:48px;border-radius:50%;border:1px solid var(--line);background:var(--panel);font-size:1.5rem;line-height:1}
+.step output{min-width:84px;text-align:center;font-family:var(--display);font-weight:800;font-size:2rem;font-variant-numeric:tabular-nums}
+.toggle{display:flex;align-items:center;gap:10px}
+.toggle input{width:22px;height:22px;accent-color:var(--amber)}
+.total{display:flex;justify-content:space-between;color:var(--muted);font-size:.9rem}
+.total b{color:var(--text);font-variant-numeric:tabular-nums}
+.go{background:var(--red);border:0;border-radius:8px;padding:18px;font-family:var(--display);font-weight:900;font-size:1.8rem;letter-spacing:.08em;text-transform:uppercase}
+.go:active{transform:scale(.98)}
+.log h2{font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 8px;font-weight:600}
+.log ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.log li{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:.9rem;font-variant-numeric:tabular-nums}
+.log li span:last-child{color:var(--muted)}
+.log .empty{color:var(--muted);font-size:.9rem}
+
+/* ---------- run ---------- */
+#run{position:fixed;inset:0;display:flex;flex-direction:column;padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(20px + env(safe-area-inset-bottom,0px));background:var(--ground);transition:background-color .4s}
+#run[data-phase="round"]{background:#3a0f0c}
+#run[data-phase="rest"]{background:#0c2e1a}
+#run[data-phase="prep"]{background:#2b2209}
+#run.warn{animation:pulse 1s steps(2,end) infinite}
+@keyframes pulse{0%{background:#3a0f0c}50%{background:#5a3a08}}
+@media (prefers-reduced-motion:reduce){#run.warn{animation:none;background:#5a3a08}}
+.top{display:flex;justify-content:space-between;align-items:center}
+.phase{font-family:var(--display);font-weight:900;text-transform:uppercase;letter-spacing:.06em;font-size:clamp(1.8rem,7vw,3rem)}
+#run[data-phase="round"] .phase{color:var(--red)}
+#run[data-phase="rest"] .phase{color:var(--green)}
+#run[data-phase="prep"] .phase,#run.warn .phase{color:var(--amber)}
+.pips{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;max-width:50%}
+.pips i{width:12px;height:12px;border-radius:50%;border:2px solid var(--muted)}
+.pips i.done{background:var(--text);border-color:var(--text)}
+.pips i.now{border-color:var(--red);background:var(--red)}
+.cue{margin-top:10px;font-size:clamp(1.05rem,4.2vw,1.4rem);line-height:1.4;font-weight:500;max-width:40ch;min-height:1.4em}
+.combo{text-align:center;min-height:5.2rem;margin-bottom:10px}
+.combo b{display:block;font-family:var(--display);font-weight:900;font-size:clamp(3rem,15vw,5.5rem);line-height:1;color:var(--amber);letter-spacing:.04em}
+.combo span{display:block;font-size:clamp(1rem,4vw,1.25rem);margin-top:4px;font-weight:500}
+.combo.flash b{animation:pop .4s ease-out}
+@keyframes pop{0%{transform:scale(1.25);opacity:.4}100%{transform:scale(1);opacity:1}}
+@media (prefers-reduced-motion:reduce){.combo.flash b{animation:none}}
+.t-legend{margin:6px 0 0;font-size:.9rem;color:var(--muted);line-height:1.5}
+.t-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.t-list li{display:grid;grid-template-columns:5.5rem 1fr auto;gap:10px;align-items:baseline;padding:12px 0;border-bottom:1px solid var(--line)}
+.t-stage{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.t-name{font-weight:600;font-size:1.08rem;min-width:0}
+.t-dim{font-family:var(--display);font-weight:800;font-size:1.3rem;font-variant-numeric:tabular-nums}
+.t-list li.main .t-name,.t-list li.main .t-dim{color:var(--amber)}
+.t-list li.main .t-stage{color:var(--amber)}
+.clock{flex:1;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-variant-numeric:tabular-nums;font-size:clamp(7rem,38vw,22rem);line-height:.85;letter-spacing:-.01em}
+.next{text-align:center;color:var(--muted);font-size:1rem;margin-bottom:14px;min-height:1.3em}
+.bar{height:8px;background:rgba(255,255,255,.12);border-radius:4px;overflow:hidden;margin-bottom:18px}
+.bar div{height:100%;width:0;background:var(--text)}
+.ctrls{display:grid;grid-template-columns:1fr 2fr 1fr;gap:10px}
+.ctrls button{border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.25);border-radius:8px;padding:16px 8px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;font-size:.9rem}
+.ctrls #pause{font-family:var(--display);font-weight:900;font-size:1.6rem;background:var(--text);color:var(--ground);border:0}
+.confirm{display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:10px}
+.confirm button{border:1px solid rgba(255,255,255,.25);background:none;border-radius:6px;padding:10px 16px}
+.confirm button.yes{background:var(--red);border-color:var(--red)}
+
+/* ---------- done ---------- */
+#done{max-width:460px;margin:0 auto;padding:48px 16px;display:flex;flex-direction:column;gap:18px;text-align:center}
+#done h2{font-family:var(--display);font-weight:900;font-size:3.2rem;text-transform:uppercase;margin:0;line-height:1}
+#done p{color:var(--muted);margin:0}
+#done .stats{display:flex;justify-content:center;gap:28px;padding:12px 0}
+#done .stats b{display:block;font-family:var(--display);font-size:2.6rem;font-weight:800;font-variant-numeric:tabular-nums}
+#done .stats span{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.check{display:flex;flex-direction:column;gap:18px;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 16px}
+.check h3{margin:0;font-family:var(--display);font-weight:800;font-size:1.6rem;text-transform:uppercase;letter-spacing:.04em}
+.check fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;min-width:0}
+.check legend{font-weight:600;margin-bottom:8px;padding:0}
+.scale{display:grid;grid-template-columns:repeat(10,1fr);gap:4px}
+.scale button{aspect-ratio:1;max-width:100%;border:1px solid var(--line);background:none;border-radius:6px;font-family:var(--display);font-weight:800;font-size:1.2rem;padding:0}
+.scale button[aria-pressed="true"]{background:var(--amber);border-color:var(--amber);color:var(--ground)}
+.ends{display:flex;justify-content:space-between;font-size:.75rem;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips button{border:1px solid var(--line);background:none;border-radius:999px;padding:9px 14px;font-size:.95rem}
+.chips button[aria-pressed="true"]{background:var(--text);color:var(--ground);border-color:var(--text)}
+.note{display:flex;flex-direction:column;gap:8px;font-weight:600}
+.note em{font-style:normal;font-weight:400;color:var(--muted);font-size:.85rem}
+.note textarea{font:inherit;font-weight:400;color:var(--text);background:var(--ground);border:1px solid var(--line);border-radius:6px;padding:10px;resize:vertical}
+.link{background:none;border:0;color:var(--muted);text-decoration:underline;padding:4px}
+.saved{color:var(--green);font-weight:600}
+.log li .tag{color:var(--amber);font-weight:600;margin-left:6px}
+.ghost{background:none;border:1px solid var(--line);border-radius:8px;padding:14px;font-weight:600}
+</style>
+</head>
+<body>
+
+
+<!-- SETUP -->
+<main id="setup">
+  <div class="brand"><h1>Round<span>.</span>Clock</h1><small>Set it. Glove up. Go.</small></div>
+
+  <nav class="tabs" role="tablist" aria-label="Pages">
+    <button role="tab" id="tabToday" aria-controls="pToday">Today</button>
+    <button role="tab" id="tabTimer" aria-controls="pTimer">Timer</button>
+  </nav>
+
+  <div class="panel" id="pToday" role="tabpanel" aria-labelledby="tabToday">
+  <form id="onb" class="check" hidden>
+    <h3>Meet your coach</h3>
+    <p class="onb-intro">Four quick questions so your first plan fits where you are now. After that, the coach learns from every check-in.</p>
+    <fieldset><legend>Your boxing level</legend>
+      <div class="chips" data-q="level"><button type="button" data-v="never">Never boxed</button><button type="button" data-v="beg">Beginner, under 1 year</button><button type="button" data-v="mid">Intermediate, 1–3 years</button><button type="button" data-v="adv">Advanced / amateur</button><button type="button" data-v="pro">I compete</button></div></fieldset>
+    <fieldset><legend>Main goal</legend>
+      <div class="chips" data-q="goal"><button type="button" data-v="fit">Get fit</button><button type="button" data-v="weight">Lose weight</button><button type="button" data-v="tech">Learn technique</button><button type="button" data-v="compete">Fight / compete</button><button type="button" data-v="stress">Clear my head</button></div></fieldset>
+    <fieldset><legend>Sessions per week</legend>
+      <div class="chips" data-q="days"><button type="button" data-v="low">1–2</button><button type="button" data-v="mid">3–4</button><button type="button" data-v="high">5 or more</button></div></fieldset>
+    <fieldset><legend>Where do you train? <span class="hint">Pick all that fit</span></legend>
+      <div class="chips" data-q="place" data-multi><button type="button" data-v="home">Home, no bag</button><button type="button" data-v="homebag">Home with a bag</button><button type="button" data-v="gym">Gym</button></div></fieldset>
+    <p class="onb-err" id="onbErr" hidden>Pick your boxing level to continue.</p>
+    <button type="submit" class="go">Make my plan</button>
+    <button type="button" class="link" id="onbSkip">Skip for now</button>
+  </form>
+  <section class="today" id="today" aria-labelledby="todayH">
+    <div class="today-head"><h2 id="todayH">Today's plan</h2><span class="badge" id="tBadge"></span></div>
+    <div id="tBody" class="t-body"></div>
+  </section>
+  </div>
+
+  <div class="panel" id="pTimer" role="tabpanel" aria-labelledby="tabTimer" hidden>
+  <div class="presets" role="group" aria-label="Presets">
+    <button data-p="3,180,60"><b>3 × 3:00</b>Short</button>
+    <button data-p="6,180,60"><b>6 × 3:00</b>Standard</button>
+    <button data-p="10,120,30"><b>10 × 2:00</b>Fast pace</button>
+  </div>
+
+  <div class="rows">
+    <div class="row"><label for="v-rounds">Rounds</label>
+      <div class="step"><button data-k="rounds" data-d="-1" aria-label="Fewer rounds">−</button><output id="v-rounds"></output><button data-k="rounds" data-d="1" aria-label="More rounds">+</button></div></div>
+    <div class="row"><label for="v-round">Round time</label>
+      <div class="step"><button data-k="round" data-d="-15" aria-label="Shorter rounds">−</button><output id="v-round"></output><button data-k="round" data-d="15" aria-label="Longer rounds">+</button></div></div>
+    <div class="row"><label for="v-rest">Rest time<em>0 = no rest</em></label>
+      <div class="step"><button data-k="rest" data-d="-15" aria-label="Shorter rest">−</button><output id="v-rest"></output><button data-k="rest" data-d="15" aria-label="Longer rest">+</button></div></div>
+    <div class="row"><label for="v-prep">Get ready<em>Time to glove up</em></label>
+      <div class="step"><button data-k="prep" data-d="-5" aria-label="Less get-ready time">−</button><output id="v-prep"></output><button data-k="prep" data-d="5" aria-label="More get-ready time">+</button></div></div>
+    <div class="row"><label for="warn">10-second warning<em>Clacks before the bell</em></label>
+      <div class="toggle"><input type="checkbox" id="warn" checked></div></div>
+    <div class="row"><label for="combos">Combo callouts<em>Combos called during each round</em></label>
+      <div class="toggle"><input type="checkbox" id="combos" checked></div></div>
+    <div class="row"><label for="voice">Say combos out loud<em>Also used in Today's plan</em></label>
+      <div class="toggle"><input type="checkbox" id="voice" checked></div></div>
+  </div>
+
+  <div class="total"><span>Total session</span><b id="total"></b></div>
+  <button class="go" id="start">Start</button>
+
+  <section class="log"><h2>Recent sessions</h2><ul id="log"></ul></section>
+  </div>
+</main>
+
+<!-- RUN -->
+<section id="run" hidden>
+  <div class="top"><div class="phase" id="phase">Get ready</div><div class="pips" id="pips"></div></div>
+  <div class="cue" id="cue"></div>
+  <div class="clock" id="clock" aria-live="off">0:10</div>
+  <div class="combo" id="combo" aria-live="polite"><b id="comboN"></b><span id="comboW"></span></div>
+  <div class="next" id="next"></div>
+  <div class="bar"><div id="bar"></div></div>
+  <div class="ctrls" id="ctrls">
+    <button id="stop">Stop</button>
+    <button id="pause">Pause</button>
+    <button id="skip">Skip</button>
+  </div>
+  <div class="confirm" id="confirm" hidden>
+    <span>End the session?</span><button class="yes" id="yesStop">End</button><button id="noStop">Keep going</button>
+  </div>
+</section>
+
+<!-- DONE -->
+<section id="done" hidden>
+  <h2>Session done</h2>
+  <p id="doneMsg">Good work.</p>
+  <div class="stats"><div><b id="dRounds">0</b><span>Rounds</span></div><div><b id="dWork">0:00</b><span>Work time</span></div></div>
+  <form id="check" class="check" hidden>
+    <h3>Coach check-in</h3>
+    <fieldset><legend>How hard was it?</legend>
+      <div class="scale" id="rpe"></div>
+      <div class="ends"><span>Easy</span><span>All-out</span></div></fieldset>
+    <fieldset><legend>Energy today</legend>
+      <div class="chips" data-q="energy"><button type="button" data-v="Low">Low</button><button type="button" data-v="OK">OK</button><button type="button" data-v="High">High</button></div></fieldset>
+    <fieldset><legend>Anything sore or hurting?</legend>
+      <div class="chips" data-q="sore" data-multi><button type="button" data-v="None">Nothing</button><button type="button" data-v="Shoulders">Shoulders</button><button type="button" data-v="Hands/wrists">Hands / wrists</button><button type="button" data-v="Legs">Legs</button><button type="button" data-v="Back">Back</button></div></fieldset>
+    <fieldset><legend>What did you work on?</legend>
+      <div class="chips" data-q="focus" data-multi><button type="button" data-v="Shadowboxing">Shadowboxing</button><button type="button" data-v="Bag">Bag</button><button type="button" data-v="Pads">Pads</button><button type="button" data-v="Footwork">Footwork</button><button type="button" data-v="Conditioning">Conditioning</button><button type="button" data-v="Sparring">Sparring</button></div></fieldset>
+    <label class="note" for="note">Anything else? <em>Optional</em>
+      <textarea id="note" rows="2" placeholder="e.g. jab felt sharp, gassed in round 5"></textarea></label>
+    <button type="submit" class="go">Save check-in</button>
+    <button type="button" class="link" id="skipCheck">Skip for today</button>
+  </form>
+  <p class="saved" id="saved" hidden>Check-in saved.</p>
+  <button class="go" id="again">Go again</button>
+  <button class="ghost" id="back">Change settings</button>
+</section>
+
+<script>
+(function(){
+const LIM={rounds:[1,30],round:[15,600],rest:[0,300],prep:[0,30]};
+const S={rounds:6,round:180,rest:60,prep:10,warn:true,combos:true,voice:true};
+const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+Object.assign(S,store.get('rc-settings')||{});
+const $=id=>document.getElementById(id);
+const fmt=s=>{s=Math.max(0,Math.ceil(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+const fmtS=s=>s<60?s+'s':fmt(s);
+
+function render(){
+  $('v-rounds').textContent=S.rounds;$('v-round').textContent=fmt(S.round);
+  $('v-rest').textContent=S.rest?fmt(S.rest):'None';$('v-prep').textContent=fmtS(S.prep);
+  $('warn').checked=S.warn;$('combos').checked=S.combos;$('voice').checked=S.voice;
+  $('total').textContent=fmt(S.rounds*S.round+(S.rounds-1)*S.rest);
+  document.querySelectorAll('[data-p]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.p===[S.rounds,S.round,S.rest].join(',')));
+  store.set('rc-settings',S);
+}
+document.querySelectorAll('[data-k]').forEach(b=>b.addEventListener('click',()=>{
+  const k=b.dataset.k,[lo,hi]=LIM[k];S[k]=Math.min(hi,Math.max(lo,S[k]+ +b.dataset.d));render();
+}));
+document.querySelectorAll('[data-p]').forEach(b=>b.addEventListener('click',()=>{
+  const [r,t,p]=b.dataset.p.split(',').map(Number);S.rounds=r;S.round=t;S.rest=p;render();
+}));
+$('warn').addEventListener('change',e=>{S.warn=e.target.checked;render()});
+$('combos').addEventListener('change',e=>{S.combos=e.target.checked;render()});
+$('voice').addEventListener('change',e=>{S.voice=e.target.checked;render()});
+
+/* ---------- log ---------- */
+const sample=[{d:'Example',r:13,w:2280,kind:'plan'}];
+function logLine(x){
+  if(x.kind==='plan')return `Full session · ${x.r} rounds · ${Math.round((x.w||0)/60)} min`;
+  return `${x.r} × ${fmt(x.t)} · rest ${x.p?fmt(x.p):'none'}`;
+}
+function renderLog(){
+  const L=store.get('rc-log')||[];const ul=$('log');ul.innerHTML='';
+  const rows=L.length?L:sample;
+  rows.slice(0,6).forEach(x=>{const li=document.createElement('li');
+    const s1=document.createElement('span'),s2=document.createElement('span');
+    s1.textContent=x.d;
+    if(x.c&&x.c.rpe){const t=document.createElement('span');t.className='tag';t.textContent='RPE '+x.c.rpe;s1.appendChild(t)}
+    s2.textContent=logLine(x);
+    li.append(s1,s2);ul.appendChild(li)});
+  if(!L.length){const li=document.createElement('li');li.className='empty';li.textContent='Your finished sessions show up here.';ul.appendChild(li)}
+}
+/* ---------- today's plan (simple coach rules) ---------- */
+const TIPS_ADV={
+  'Shadowboxing':'Jab first, move your head after every combo. Finish each combo with a pivot out.',
+  'Bag':'Sit down on your punches. Last 30 seconds of each round all-out.',
+  'Footwork':'Angles and pivots. Stay light on the balls of your feet.',
+  'Conditioning':'Burpees, squat jumps, fast straight punches. Hard for 30 seconds, steady for 30, repeat.'
+};
+const TIPS_BASIC={
+  'Shadowboxing':'Stance and guard first. Jab, cross, then hands straight back to your chin.',
+  'Bag':'Light, clean shots. Jab-cross, then step away. Accuracy before power.',
+  'Footwork':'Step forward, back, left and right. Never cross your feet.',
+  'Conditioning':'Fast straight punches, high knees, squats. Push yourself, but keep breathing.'
+};
+const LEVELS={
+  never:{l:'someone new to boxing',p:[3,120,60]},
+  beg:{l:'a beginner',p:[4,120,60]},
+  mid:{l:'an intermediate boxer',p:[5,180,60]},
+  adv:{l:'an advanced boxer',p:[6,180,60]},
+  pro:{l:'a competing boxer',p:[8,180,45]}
+};
+// warm-up: [rope rounds, rope time], [shadow rounds, shadow time]; finisher: [rounds, time]
+const WARM={never:[[2,90],[2,90]],beg:[[2,120],[2,120]],mid:[[3,120],[2,180]],adv:[[3,180],[2,180]],pro:[[3,180],[2,180]]};
+const FIN={never:[2,60],beg:[2,60],mid:[3,60],adv:[3,90],pro:[4,90]};
+const GOAL_FOCUS={fit:'Conditioning',weight:'Conditioning',tech:'Shadowboxing',compete:'Bag',stress:'Bag'};
+const GAP={low:8,mid:5,high:3};
+const O={};
+const clamp=(k,v)=>Math.min(LIM[k][1],Math.max(LIM[k][0],v));
+let P=null;
+const profile=()=>store.get('rc-profile');
+const isBasic=()=>{const pr=profile();return !!pr&&(pr.level==='never'||pr.level==='beg')};
+const places=()=>[].concat((profile()||{}).place||[]);
+function todayEq(){
+  const t=store.get('rc-today');if(t&&t.eq)return Object.assign({},t.eq);
+  const pl=places();return {bag:pl.length?pl.some(p=>p!=='home'):true,rope:true};
+}
+function setEq(eq){store.set('rc-today',{d:new Date().toDateString(),eq})}
+/* ---------- combo callouts ---------- */
+const PUNCH={'1':['one','jab'],'2':['two','cross'],'3':['three','hook'],'4':['four','rear hook'],'5':['five','uppercut'],'6':['six','rear uppercut']};
+const COMBOS={
+  basic:['1','1-1','1-2','1-1-2','1-2-1','2-1-2'],
+  mid:['1-2','1-1-2','1-2-3','3-2','1-2-3-2','1-2-slip-2','1-6-3-2','2-3-2','1-2-roll-2'],
+  adv:['1-2-3-2','1-1-2-3','1-2-5-2','2-3-2','1-2-roll-2-3','1-6-3-2','slip-2-3-2','3-3-2','1-2-3-pivot','1-2-3-4','1-1-2-roll-3-2','5-2-3']
+};
+function comboTier(){if(R.on&&R.list[R.i]&&R.list[R.i].combos==='light')return 'basic';const l=(profile()||{}).level;return l==='never'||l==='beg'?'basic':(l==='adv'||l==='pro')?'adv':'mid'}
+function comboGap(){const base={basic:7,mid:6,adv:4.5}[comboTier()];return base+Math.random()*2-1}
+let lastCombo='';
+function pickCombo(){const L=COMBOS[comboTier()];let c;do{c=L[Math.floor(Math.random()*L.length)]}while(c===lastCombo&&L.length>1);lastCombo=c;return c}
+function say(t){try{if(!S.voice||!('speechSynthesis' in window))return false;speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(t);u.rate=1.15;u.lang='en-US';speechSynthesis.speak(u);return true}catch(e){return false}}
+function callCombo(){
+  const c=pickCombo(),parts=c.split('-');
+  $('comboN').textContent=c;
+  $('comboW').textContent=parts.map(p=>PUNCH[p]?PUNCH[p][1]:p).join(' · ');
+  const box=$('combo');box.classList.remove('flash');void box.offsetWidth;box.classList.add('flash');
+  if(!say(parts.map(p=>PUNCH[p]?PUNCH[p][0]:p).join(', ')))beep(true);
+}
+function clearCombo(){$('comboN').textContent='';$('comboW').textContent=''}
+function tipFor(f){return (isBasic()?TIPS_BASIC:TIPS_ADV)[f]}
+function blocksFor(main,focus,kind){
+  const pr=profile()||{};const lv=LEVELS[pr.level]?pr.level:'mid';const basic=isBasic();
+  const [rope,shadow]=WARM[lv];const B=[];
+  const eq=todayEq();
+  B.push(eq.rope?{name:'Jump rope',stage:'Warm-up',rounds:rope[0],round:rope[1],rest:30,gap:45,
+    tip:basic?'Small, easy bounces. Find a steady rhythm.':'Light on the balls of your feet. Mix in high knees and double-unders.'}
+   :{name:'Skip & move',stage:'Warm-up',rounds:rope[0],round:rope[1],rest:30,gap:45,
+    tip:'No rope: skip on the spot, jumping jacks and high knees. Stay light.'});
+  if(focus!=='Shadowboxing')B.push({name:'Shadowboxing',stage:'Warm-up',rounds:shadow[0],round:shadow[1],rest:30,gap:60,combos:'light',
+    tip:'Loose and light. Get the shoulders and hips moving. No power yet.'});
+  B.push({name:focus,stage:'Main',rounds:main.rounds,round:main.round,rest:main.rest,gap:60,tip:tipFor(focus),main:true,combos:focus==='Shadowboxing'||focus==='Bag'});
+  let fr=FIN[lv][0];if(kind==='ease')fr=Math.max(1,fr-1);
+  B.push({name:focus==='Conditioning'?'Core':'Strength & core',stage:'Finisher',rounds:fr,round:FIN[lv][1],rest:30,gap:30,
+    tip:basic?'Pushups, sit-ups, plank. Your own pace, good form first.':'Pushups, sit-ups, plank, burpees. Keep moving the whole round.'});
+  B.push({name:'Cool-down',stage:'Cool-down',rounds:1,round:120,rest:0,gap:0,cool:true,
+    tip:'Walk it out and breathe slow. Stretch shoulders, chest and calves.'});
+  return B;
+}
+const blocksTime=B=>B.reduce((a,b,i)=>a+b.rounds*b.round+(b.rounds-1)*b.rest+(i<B.length-1?b.gap:0),0);
+const blocksRounds=B=>B.reduce((a,b)=>a+b.rounds,0);
+function makePlan(){
+  const all=store.get('rc-log')||[];
+  const L=all.filter(x=>x.c&&x.c.rpe);
+  const pr=profile()||{};
+  const noBag=!todayEq().bag;
+  const done=p=>Object.assign(p,{blocks:blocksFor(p.main,p.focus,p.kind)});
+  if(!L.length){
+    if(!pr.level)return null;
+    const [r,t,p]=LEVELS[pr.level].p;
+    let focus=GOAL_FOCUS[pr.goal]||'Shadowboxing';if(focus==='Bag'&&noBag)focus='Shadowboxing';
+    return done({main:{rounds:r,round:t,rest:p},kind:'start',focus,
+      why:`A starting point for ${LEVELS[pr.level].l}, short enough to keep your form clean. After each session, the check-in tells your coach how it felt and the plan adjusts.`});
+  }
+  const last=L[0],c=last.c;
+  const p=Object.assign({},last.m||{rounds:last.r,round:last.t,rest:last.p});
+  const rpe=L.slice(0,3).map(x=>x.c.rpe);
+  const avg=rpe.reduce((a,b)=>a+b,0)/rpe.length;
+  const sore=(c.sore||[]).filter(s=>s!=='None');
+  const days=last.ts?Math.floor((Date.now()-last.ts)/864e5):0;
+  let kind,why;
+  if(sore.length){
+    kind='ease';p.rounds=clamp('rounds',p.rounds-1);p.rest=clamp('rest',p.rest+30);
+    why=`You felt ${sore.join(' and ').toLowerCase()} last time. One main round less, more rest and a shorter finisher. If it still hurts, take the day off.`;
+  }else if(rpe.length>=2&&rpe[0]>=9&&rpe[1]>=9){
+    kind='ease';p.rest=clamp('rest',p.rest+15);
+    why='Your last two sessions were close to all-out. Same main rounds with a bit more rest, so you recover and keep quality high.';
+  }else if(c.energy==='Low'){
+    kind='ease';p.rounds=clamp('rounds',p.rounds-1);
+    why='Energy was low last time. One main round less today. Clean technique over speed.';
+  }else if(days>=(GAP[pr.days]||5)){
+    kind='ease';p.rounds=clamp('rounds',p.rounds-1);
+    why=`${days} days since your last session. Ease back in with one main round less.`;
+  }else if(rpe.length>=3&&avg<=5){
+    kind='up';
+    if(p.rest>45){p.rest=clamp('rest',p.rest-15);why='Your last 3 sessions felt easy. Level up: 15 seconds less rest between main rounds.'}
+    else{p.rounds=clamp('rounds',p.rounds+1);why='Your last 3 sessions felt easy. Level up: one extra main round.'}
+  }else{
+    kind='hold';
+    why=rpe[0]<=5?'That felt easy. Do it again. If it feels easy three times in a row, we level up.':'Good level for you right now. Same session, aim to make it sharper.';
+  }
+  // focus: avoid hands if they're sore, otherwise pick what you've done least recently
+  const opts=sore.includes('Hands/wrists')?['Shadowboxing','Footwork']:Object.keys(TIPS_ADV).filter(f=>!(noBag&&f==='Bag'));
+  const seen={};all.slice(0,6).forEach((x,i)=>((x.c&&x.c.focus)||[]).concat(x.f?[x.f]:[]).forEach(f=>{if(!(f in seen))seen[f]=i}));
+  const focus=opts.slice().sort((a,b)=>(b in seen?seen[b]:99)-(a in seen?seen[a]:99))[0];
+  return done({main:p,kind,why,focus});
+}
+function renderPlan(){
+  P=makePlan();const b=$('tBody'),badge=$('tBadge');b.innerHTML='';
+  const el=(t,c,txt)=>{const e=document.createElement(t);if(c)e.className=c;if(txt!=null)e.textContent=txt;return e};
+  const pr=profile();
+  if(!pr){$('onb').hidden=false;$('today').hidden=true;return}
+  $('onb').hidden=true;$('today').hidden=false;
+  if(!P){badge.textContent='';badge.className='badge';
+    const e=el('p','t-empty','No plan yet. Tell your coach about you, or finish one session on the Timer page and answer the check-in.');
+    const a=el('div','t-actions');
+    const s=el('button','go','Tell your coach about you');s.addEventListener('click',openOnb);
+    const g=el('button','ghost','Go to timer');g.addEventListener('click',()=>tab('timer'));a.append(s,g);
+    b.append(e,a);return}
+  badge.textContent={up:'Level up',hold:'Hold',ease:'Easy day',start:'Starting plan'}[P.kind];badge.className='badge '+(P.kind==='start'?'hold':P.kind);
+  const eq=todayEq();
+  const q=el('div','t-eq');q.appendChild(el('div','t-label','What do you have today?'));
+  const ch=el('div','chips');
+  [['bag','Heavy bag'],['rope','Jump rope']].forEach(([k,l])=>{const bt=el('button',null,l);bt.type='button';
+    bt.setAttribute('aria-pressed',!!eq[k]);bt.addEventListener('click',()=>{const e=todayEq();e[k]=!e[k];setEq(e);renderPlan()});ch.appendChild(bt)});
+  q.appendChild(ch);
+  const m=el('div','t-main',`${Math.round(blocksTime(P.blocks)/60)} min`);
+  m.appendChild(el('small',null,`Full session · ${blocksRounds(P.blocks)} rounds`));
+  const list=el('ol','t-list');
+  P.blocks.forEach(x=>{const li=el('li',x.main?'main':'');
+    li.append(el('span','t-stage',x.stage),el('span','t-name',x.name),el('span','t-dim',`${x.rounds} × ${fmt(x.round)}`));
+    list.appendChild(li)});
+  const f=el('div','t-block');f.append(el('div','t-label','Main focus'),el('div','t-focus',P.focus),el('p','t-tip',tipFor(P.focus)));
+  if(P.blocks.some(x=>x.combos))f.appendChild(el('p','t-legend','Combo calls in shadowboxing and bag rounds: 1 jab · 2 cross · 3 hook · 4 rear hook · 5 uppercut · 6 rear uppercut'));
+  const w=el('div','t-block');w.append(el('div','t-label','Why this plan'),el('p','t-why',P.why));
+  const a=el('div','t-actions');
+  const go=el('button','go','Start full session');
+  go.addEventListener('click',()=>start('plan'));
+  const adj=el('button','ghost','Just the main rounds');
+  adj.addEventListener('click',()=>{S.rounds=P.main.rounds;S.round=P.main.round;S.rest=P.main.rest;render();tab('timer')});
+  a.append(go,adj);
+  const who=el('div','t-who');
+  who.appendChild(el('span',null,pr.level?'Plan for '+LEVELS[pr.level].l:'No profile yet'));
+  const ed=el('button','link',pr.level?'Edit about me':'Tell your coach about you');ed.type='button';ed.addEventListener('click',openOnb);who.appendChild(ed);
+  b.append(q,m,list,f,w,a,who);
+}
+function openOnb(){
+  const pr=profile()||{};Object.keys(O).forEach(k=>delete O[k]);
+  $('onb').querySelectorAll('.chips').forEach(g=>{const q=g.dataset.q;if(pr[q])O[q]=pr[q];
+    const cur=[].concat(pr[q]||[]);g.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',cur.includes(x.dataset.v)))});
+  $('onbErr').hidden=true;$('onb').hidden=false;$('today').hidden=true;tab('today');
+}
+$('onb').addEventListener('submit',e=>{e.preventDefault();
+  if(!O.level){$('onbErr').hidden=false;return}
+  store.set('rc-profile',Object.assign({},O));renderPlan();window.scrollTo(0,0);
+});
+$('onbSkip').addEventListener('click',()=>{if(!profile())store.set('rc-profile',{});renderPlan()});
+function tab(n){
+  const t=n==='today';$('tabToday').setAttribute('aria-selected',t);$('tabTimer').setAttribute('aria-selected',!t);
+  $('pToday').hidden=!t;$('pTimer').hidden=t;
+}
+$('tabToday').addEventListener('click',()=>tab('today'));
+$('tabTimer').addEventListener('click',()=>tab('timer'));
+function saveLog(){
+  if(R.done<1)return;const L=store.get('rc-log')||[];
+  const d=new Date();const ds=d.toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'})+' '+d.toTimeString().slice(0,5);
+  const main=R.blocks.find(x=>x.main)||R.blocks[0];
+  L.unshift({d:ds,ts:Date.now(),kind:R.mode,r:R.done,w:Math.round(R.work),t:main.round,p:main.rest,
+    m:{rounds:main.rounds,round:main.round,rest:main.rest},f:R.mode==='plan'?main.name:undefined});
+  store.set('rc-log',L.slice(0,50));
+}
+
+/* ---------- sound ---------- */
+let ac=null,keep=null;
+// Treat our sounds as media playback, so iPhones still play them with the silent switch on.
+function mediaMode(){
+  try{if(navigator.audioSession)navigator.audioSession.type='playback'}catch(e){}
+  try{
+    if(!keep){
+      const sr=8000,n=sr/2,b=new ArrayBuffer(44+n*2),v=new DataView(b);
+      const w=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i))};
+      w(0,'RIFF');v.setUint32(4,36+n*2,true);w(8,'WAVEfmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+      v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);w(36,'data');v.setUint32(40,n*2,true);
+      keep=new Audio(URL.createObjectURL(new Blob([b],{type:'audio/wav'})));
+      keep.loop=true;keep.setAttribute('playsinline','');keep.volume=0.01;
+    }
+    const p=keep.play();if(p&&p.catch)p.catch(()=>{});
+  }catch(e){}
+}
+function audio(){if(!ac){try{ac=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(ac&&ac.state==='suspended')ac.resume();return ac}
+function bell(times=1){const a=audio();if(!a)return;
+  for(let n=0;n<times;n++){const t0=a.currentTime+n*0.32;
+    [[1,.5],[2.76,.22],[5.4,.12],[8.93,.06]].forEach(([m,amp])=>{
+      const o=a.createOscillator(),g=a.createGain();o.type='sine';o.frequency.value=620*m;
+      g.gain.setValueAtTime(0.0001,t0);g.gain.exponentialRampToValueAtTime(amp,t0+0.005);
+      g.gain.exponentialRampToValueAtTime(0.0001,t0+(times>1?0.9:2.2)/Math.sqrt(m));
+      o.connect(g).connect(a.destination);o.start(t0);o.stop(t0+2.5)});}
+}
+function clack(){const a=audio();if(!a)return;
+  for(let n=0;n<2;n++){const t0=a.currentTime+n*0.18;const len=0.05*a.sampleRate;
+    const buf=a.createBuffer(1,len,a.sampleRate),d=buf.getChannelData(0);
+    for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,4);
+    const s=a.createBufferSource(),f=a.createBiquadFilter(),g=a.createGain();
+    s.buffer=buf;f.type='bandpass';f.frequency.value=2200;g.gain.value=1.4;
+    s.connect(f).connect(g).connect(a.destination);s.start(t0)}
+}
+function beep(hi){const a=audio();if(!a)return;const t0=a.currentTime;
+  const o=a.createOscillator(),g=a.createGain();o.type='square';o.frequency.value=hi?1320:880;
+  g.gain.setValueAtTime(0.12,t0);g.gain.exponentialRampToValueAtTime(0.0001,t0+0.15);
+  o.connect(g).connect(a.destination);o.start(t0);o.stop(t0+0.2)}
+
+/* ---------- wake lock ---------- */
+let lock=null;
+async function wake(){try{if('wakeLock' in navigator&&!lock){lock=await navigator.wakeLock.request('screen');lock.addEventListener('release',()=>lock=null)}}catch(e){}}
+function unwake(){try{lock&&lock.release()}catch(e){}lock=null}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&R.on&&!R.paused)wake()});
+
+/* ---------- engine ---------- */
+const R={on:false,paused:false,mode:'timer',blocks:[],list:[],i:0,end:0,left:0,last:null,done:0,work:0,total:0,timer:null};
+function build(B){
+  const L=[];if(S.prep)L.push({k:'prep',s:S.prep,idx:0});
+  const total=blocksRounds(B);let idx=0;
+  B.forEach((b,bi)=>{for(let r=1;r<=b.rounds;r++){idx++;
+    L.push({k:'round',s:b.round,n:r,of:b.rounds,name:b.name,tip:b.tip,cool:!!b.cool,combos:b.combos||false,idx,total});
+    if(bi===B.length-1&&r===b.rounds)continue;
+    const rs=r<b.rounds?b.rest:b.gap;if(rs>0)L.push({k:'rest',s:rs,idx})}});
+  return L;
+}
+function show(id){['setup','run','done'].forEach(x=>$(x).hidden=x!==id)}
+function start(mode){
+  if(mode!=='plan'&&mode!=='timer')mode=R.mode||'timer';
+  if(mode==='plan'&&!P)mode='timer';
+  R.mode=mode;
+  R.blocks=mode==='plan'?P.blocks:[{name:null,rounds:S.rounds,round:S.round,rest:S.rest,gap:0,tip:'',main:true,combos:S.combos}];
+  mediaMode();audio();
+  if(S.voice)try{const u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u)}catch(e){}
+  R.list=build(R.blocks);R.total=blocksRounds(R.blocks);R.i=-1;R.done=0;R.work=0;R.on=true;R.paused=false;
+  $('pause').textContent='Pause';$('confirm').hidden=true;$('ctrls').hidden=false;
+  const p=$('pips');p.innerHTML='';for(let r=0;r<R.total;r++)p.appendChild(document.createElement('i'));
+  show('run');wake();next();clearInterval(R.timer);R.timer=setInterval(tick,100);
+}
+const roundLabel=x=>x.name?`${x.name} ${x.n}/${x.of}`:`Round ${x.n} / ${x.of}`;
+function next(){
+  const cur=R.list[R.i];
+  if(cur&&cur.k==='round'){R.done++;R.work+=Math.min(cur.s,Math.max(0,cur.s-Math.max(0,(R.paused?R.left:R.end-performance.now())/1000)))}
+  R.i++;
+  if(R.i>=R.list.length){finish(true);return}
+  const ph=R.list[R.i];R.end=performance.now()+ph.s*1000;R.last=null;R.callAt=3;clearCombo();
+  const run=$('run');run.dataset.phase=ph.k;run.classList.remove('warn');
+  const up=R.list.slice(R.i+1).find(x=>x.k==='round');
+  if(ph.k==='round'){$('phase').textContent=roundLabel(ph);$('cue').textContent=ph.tip;bell(ph.cool?1:3)}
+  else{$('phase').textContent=ph.k==='rest'?'Rest':'Get ready';$('cue').textContent=up&&up.name?`Up next: ${up.name}. ${up.tip}`:'';if(ph.k==='rest')bell(1)}
+  $('next').textContent=up?`Next: ${roundLabel(up)} · ${fmt(up.s)}`:(ph.cool?'Last one. Breathe and stretch.':'Last round. Empty the tank.');
+  [...$('pips').children].forEach((el,j)=>{const n=j+1;
+    el.className=(ph.k==='round'?n<ph.idx:n<=ph.idx)?'done':(ph.k==='round'&&n===ph.idx?'now':'')});
+  tick();
+}
+function tick(){
+  if(!R.on||R.paused)return;
+  const ph=R.list[R.i];const left=(R.end-performance.now())/1000;
+  if(left<=0){next();return}
+  const sec=Math.ceil(left);
+  $('clock').textContent=fmt(left);
+  $('bar').style.width=(100*(1-left/ph.s)).toFixed(2)+'%';
+  if(ph.k==='round'&&ph.combos&&left>3){const el=ph.s-left;if(el>=R.callAt){callCombo();R.callAt=el+comboGap()}}
+  if(sec!==R.last){
+    if(ph.k==='round'&&!ph.cool&&S.warn&&sec===10&&ph.s>15){clack();$('run').classList.add('warn')}
+    if(ph.k!=='round'&&sec<=3)beep(false);
+    R.last=sec;
+  }
+}
+function finish(complete){
+  clearInterval(R.timer);R.on=false;unwake();clearCombo();try{speechSynthesis.cancel()}catch(e){}
+  saveLog();renderLog();
+  if(complete)bell(1);
+  setTimeout(()=>{try{if(!R.on&&keep)keep.pause()}catch(e){}},3000);
+  const r=R.done;
+  $('dRounds').textContent=r;$('dWork').textContent=fmt(R.work);
+  $('doneMsg').textContent=complete?(R.mode==='plan'?'Full session finished. Good work.':'All rounds finished. Good work.'):r?`Stopped after ${r} round${r>1?'s':''}.`:'Stopped before the first round finished.';
+  resetCheck(r>=1);
+  show('done');
+}
+
+/* ---------- check-in ---------- */
+const C={},CK=C;
+(function(){const box=$('rpe');for(let i=1;i<=10;i++){const b=document.createElement('button');b.type='button';b.textContent=i;b.setAttribute('aria-label','Effort '+i+' of 10');
+  b.addEventListener('click',()=>{C.rpe=i;[...box.children].forEach(x=>x.setAttribute('aria-pressed',x===b))});box.appendChild(b)}})();
+document.querySelectorAll('.chips').forEach(g=>{const q=g.dataset.q,multi=g.hasAttribute('data-multi');const C=g.closest('#onb')?O:CK;
+  g.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
+    if(!multi){C[q]=b.dataset.v;g.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));return}
+    let on=b.getAttribute('aria-pressed')!=='true';
+    if(b.dataset.v==='None'&&on)g.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed','false'));
+    else if(on){const n=g.querySelector('[data-v="None"]');n&&n.setAttribute('aria-pressed','false')}
+    b.setAttribute('aria-pressed',on);
+    C[q]=[...g.querySelectorAll('[aria-pressed="true"]')].map(x=>x.dataset.v);
+  }))});
+function resetCheck(show){
+  Object.keys(C).forEach(k=>delete C[k]);$('note').value='';
+  document.querySelectorAll('#check [aria-pressed]').forEach(x=>x.setAttribute('aria-pressed','false'));
+  $('check').hidden=!show;$('saved').hidden=true;
+}
+$('check').addEventListener('submit',e=>{e.preventDefault();
+  const L=store.get('rc-log')||[];
+  if(L[0]){L[0].c=Object.assign({},C,{note:$('note').value.trim()});store.set('rc-log',L)}
+  $('check').hidden=true;$('saved').hidden=false;renderLog();renderPlan();
+});
+$('back').addEventListener('click',()=>{renderPlan();tab(P?'today':'timer')});
+$('skipCheck').addEventListener('click',()=>{$('check').hidden=true});
+$('start').addEventListener('click',()=>start('timer'));
+$('again').addEventListener('click',()=>start(R.mode));
+$('back').addEventListener('click',()=>show('setup'));
+$('pause').addEventListener('click',()=>{
+  if(!R.paused){R.paused=true;R.left=R.end-performance.now();$('pause').textContent='Resume';unwake()}
+  else{R.paused=false;R.end=performance.now()+R.left;$('pause').textContent='Pause';wake();mediaMode();audio()}
+});
+$('skip').addEventListener('click',()=>{if(R.on){if(R.paused){R.paused=false;$('pause').textContent='Pause'}next()}});
+$('stop').addEventListener('click',()=>{$('ctrls').hidden=true;$('confirm').hidden=false});
+$('noStop').addEventListener('click',()=>{$('confirm').hidden=true;$('ctrls').hidden=false});
+$('yesStop').addEventListener('click',()=>{const ph=R.list[R.i];finish(false)});
+
+renderLog();renderPlan();render();tab(P||!profile()?'today':'timer');
+})();
+</script>
+
+</body>
+</html>
