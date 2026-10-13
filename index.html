@@ -78,6 +78,10 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 .step{display:flex;align-items:center;gap:6px}
 .step button{width:48px;height:48px;border-radius:50%;border:1px solid var(--line);background:var(--panel);font-size:1.5rem;line-height:1}
 .step output{min-width:84px;text-align:center;font-family:var(--display);font-weight:800;font-size:2rem;font-variant-numeric:tabular-nums}
+.row.stack{grid-template-columns:1fr}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:4px}
+.seg button{background:none;border:0;border-radius:6px;padding:11px 4px;font-weight:600;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--amber);color:var(--ground)}
 .toggle{display:flex;align-items:center;gap:10px}
 .toggle input{width:22px;height:22px;accent-color:var(--amber)}
 .total{display:flex;justify-content:space-between;color:var(--muted);font-size:.9rem}
@@ -244,8 +248,8 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
       <div class="step"><button data-k="rest" data-d="-15" aria-label="Shorter rest">−</button><output id="v-rest"></output><button data-k="rest" data-d="15" aria-label="Longer rest">+</button></div></div>
     <div class="row"><label for="v-prep">Get ready<em>Time to glove up</em></label>
       <div class="step"><button data-k="prep" data-d="-5" aria-label="Less get-ready time">−</button><output id="v-prep"></output><button data-k="prep" data-d="5" aria-label="More get-ready time">+</button></div></div>
-    <div class="row"><label for="warn">10-second warning<em>Clacks before the bell</em></label>
-      <div class="toggle"><input type="checkbox" id="warn" checked></div></div>
+    <div class="row stack"><label>End-of-round warning<em>Clacks before the bell</em></label>
+      <div class="seg" id="warnSeg" role="group" aria-label="End-of-round warning"><button type="button" data-w="off">Off</button><button type="button" data-w="10">10 sec</button><button type="button" data-w="30">30 sec</button><button type="button" data-w="30+10">Both</button></div></div>
     <div class="row"><label for="combos">Combo callouts<em>Combos called during each round</em></label>
       <div class="toggle"><input type="checkbox" id="combos" checked></div></div>
     <div class="row"><label for="voice">Say combos out loud<em>Also used in Today's plan</em></label>
@@ -262,7 +266,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
   <div class="panel" id="pProgress" role="tabpanel" aria-labelledby="tabProgress" hidden>
     <div id="progBody" class="prog"></div>
   </div>
-  <p class="ver">Round Clock · updated 13 Oct 2026 · level-ups</p>
+  <p class="ver">Round Clock · updated 13 Oct 2026 · warnings</p>
 </main>
 
 <!-- RUN -->
@@ -313,9 +317,10 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 <script>
 (function(){
 const LIM={rounds:[1,30],round:[15,600],rest:[0,300],prep:[0,30]};
-const S={rounds:6,round:180,rest:60,prep:10,warn:true,combos:true,voice:true,voiceName:''};
+const S={rounds:6,round:180,rest:60,prep:10,warn:true,warnAt:'10',combos:true,voice:true,voiceName:''};
 const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 Object.assign(S,store.get('rc-settings')||{});
+if(S.warn===false&&!(store.get('rc-settings')||{}).warnAt)S.warnAt='off';
 const $=id=>document.getElementById(id);
 const fmt=s=>{s=Math.max(0,Math.ceil(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
 const fmtS=s=>s<60?s+'s':fmt(s);
@@ -323,7 +328,7 @@ const fmtS=s=>s<60?s+'s':fmt(s);
 function render(){
   $('v-rounds').textContent=S.rounds;$('v-round').textContent=fmt(S.round);
   $('v-rest').textContent=S.rest?fmt(S.rest):'None';$('v-prep').textContent=fmtS(S.prep);
-  $('warn').checked=S.warn;$('combos').checked=S.combos;$('voice').checked=S.voice;
+  document.querySelectorAll('#warnSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.w===S.warnAt));$('combos').checked=S.combos;$('voice').checked=S.voice;
   $('total').textContent=fmt(S.rounds*S.round+(S.rounds-1)*S.rest);
   document.querySelectorAll('[data-p]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.p===[S.rounds,S.round,S.rest].join(',')));
   store.set('rc-settings',S);
@@ -334,7 +339,7 @@ document.querySelectorAll('[data-k]').forEach(b=>b.addEventListener('click',()=>
 document.querySelectorAll('[data-p]').forEach(b=>b.addEventListener('click',()=>{
   const [r,t,p]=b.dataset.p.split(',').map(Number);S.rounds=r;S.round=t;S.rest=p;render();
 }));
-$('warn').addEventListener('change',e=>{S.warn=e.target.checked;render()});
+document.querySelectorAll('#warnSeg button').forEach(b=>b.addEventListener('click',()=>{S.warnAt=b.dataset.w;S.warn=S.warnAt!=='off';render()}));
 $('combos').addEventListener('change',e=>{S.combos=e.target.checked;render()});
 $('voice').addEventListener('change',e=>{S.voice=e.target.checked;render()});
 
@@ -680,8 +685,8 @@ function bell(times=1){const a=audio();if(!a)return;
       g.gain.exponentialRampToValueAtTime(0.0001,t0+(times>1?0.9:2.2)/Math.sqrt(m));
       o.connect(g).connect(a.destination);o.start(t0);o.stop(t0+2.5)});}
 }
-function clack(){const a=audio();if(!a)return;
-  for(let n=0;n<2;n++){const t0=a.currentTime+n*0.18;const len=0.05*a.sampleRate;
+function clack(times=2){const a=audio();if(!a)return;
+  for(let n=0;n<times;n++){const t0=a.currentTime+n*0.18;const len=0.05*a.sampleRate;
     const buf=a.createBuffer(1,len,a.sampleRate),d=buf.getChannelData(0);
     for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,4);
     const s=a.createBufferSource(),f=a.createBiquadFilter(),g=a.createGain();
@@ -748,7 +753,11 @@ function tick(){
   $('bar').style.width=(100*(1-left/ph.s)).toFixed(2)+'%';
   if(ph.k==='round'&&ph.combos&&left>3){const el=ph.s-left;if(el>=R.callAt){callCombo();R.callAt=el+comboGap()}}
   if(sec!==R.last){
-    if(ph.k==='round'&&!ph.cool&&S.warn&&sec===10&&ph.s>15){clack();$('run').classList.add('warn')}
+    const marks={off:[],'10':[10],'30':[30],'30+10':[30,10]}[S.warnAt]||[10];
+    if(ph.k==='round'&&!ph.cool&&marks.includes(sec)&&ph.s>sec+5){
+      if(sec===10){clack(2);$('run').classList.add('warn')}
+      else{clack(1);const run=$('run');run.classList.add('warn');setTimeout(()=>{const p=R.list[R.i];if(!(p&&p.k==='round'&&(R.end-performance.now())/1000<=10&&marks.includes(10)))run.classList.remove('warn')},2000)}
+    }
     if(ph.k!=='round'&&sec<=3)beep(false);
     R.last=sec;
   }
