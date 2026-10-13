@@ -226,7 +226,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 
   <section class="log"><h2>Recent sessions</h2><ul id="log"></ul></section>
   </div>
-  <p class="ver">Round Clock · updated 13 Oct 2026 · coach voice 2</p>
+  <p class="ver">Round Clock · updated 13 Oct 2026 · coach voice 3</p>
 </main>
 
 <!-- RUN -->
@@ -397,7 +397,7 @@ function loadClips(){
 function playClips(words){
   const a=audio();if(!a||S.voiceName||!words.every(w=>CLIP[w]))return false;
   let t=a.currentTime+0.02;
-  words.forEach(w=>{const s=a.createBufferSource(),g=a.createGain();g.gain.value=1;s.buffer=CLIP[w];s.connect(g).connect(a.destination);s.start(t);t+=CLIP[w].duration+0.04});
+  words.forEach(w=>{const s=a.createBufferSource(),g=a.createGain();g.gain.value=1;s.buffer=CLIP[w];s.connect(g).connect(a.destination);s.start(t);t+=CLIP[w].duration+0.28});
   const n=$('voiceNow');if(n)n.textContent='Using: built-in coach voice';
   return true;
 }
