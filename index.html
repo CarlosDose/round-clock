@@ -90,6 +90,8 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 .go:active{transform:scale(.98)}
 .log h2{font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 8px;font-weight:600}
 .log ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.log li.tap,.p-sess li{cursor:pointer}
+.log li.tap span:last-child::after,.p-sess li span:last-child::after{content:' ›';color:var(--muted)}
 .log li{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:.9rem;font-variant-numeric:tabular-nums}
 .log li span:last-child{color:var(--muted)}
 .log .empty{color:var(--muted);font-size:.9rem}
@@ -181,11 +183,22 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 .eq-tile[aria-pressed="false"] b{color:var(--muted);text-decoration:line-through}
 .eq-note{margin:0;font-size:.92rem;color:var(--muted);line-height:1.45}
 .sheet{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center;padding:16px}
-.sheet-card{width:100%;max-width:460px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 16px calc(20px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px;animation:lvlpop .3s ease-out}
+.sheet-card{width:100%;max-width:460px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 16px calc(20px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px;animation:lvlpop .3s ease-out;max-height:calc(100% - 8px);overflow-y:auto}
 .t-rounds{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
 .t-rounds li{display:flex;align-items:center;gap:10px;font-weight:600;font-size:1.02rem}
 .t-rounds li.hl{color:var(--amber)}
 .t-rn{display:inline-grid;place-items:center;width:1.7rem;height:1.7rem;border-radius:50%;border:1px solid var(--line);font-family:var(--display);font-weight:800;font-size:.95rem;flex:none}
+.ghost.danger{color:var(--red);border-color:color-mix(in srgb,var(--red) 50%,var(--line))}
+.edit-note{font:inherit;color:var(--text);background:var(--ground);border:1px solid var(--line);border-radius:6px;padding:10px;resize:vertical}
+.tour{align-items:center}
+.tour-list{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:8px;font-size:1.02rem;line-height:1.4}
+.tour-list li::marker{color:var(--amber)}
+.tour-row{display:flex;justify-content:space-between;align-items:center}
+.tour-dots{display:flex;gap:6px}
+.tour-dots i{width:8px;height:8px;border-radius:50%;background:var(--line)}
+.tour-dots i.on{background:var(--amber)}
+#tourLink{align-self:center;margin-top:8px}
+.t-who{flex-wrap:wrap}
 .prog{display:flex;flex-direction:column;gap:18px}
 .p-hero{display:flex;flex-direction:column;gap:6px}
 .p-big{font-family:var(--display);font-weight:900;font-size:clamp(3rem,14vw,4.2rem);line-height:.9;font-variant-numeric:tabular-nums}
@@ -282,7 +295,8 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
   <div class="panel" id="pProgress" role="tabpanel" aria-labelledby="tabProgress" hidden>
     <div id="progBody" class="prog"></div>
   </div>
-  <p class="ver">Round Clock · updated 13 Oct 2026 · round themes</p>
+  <button type="button" class="link" id="tourLink">How Round Clock works</button>
+  <p class="ver">Round Clock · updated 13 Oct 2026 · fix + intro</p>
 </main>
 
 <!-- RUN -->
@@ -368,7 +382,7 @@ function logLine(x){
 function renderLog(){
   const L=store.get('rc-log')||[];const ul=$('log');ul.innerHTML='';
   const rows=L.length?L:sample;
-  rows.slice(0,6).forEach(x=>{const li=document.createElement('li');
+  rows.slice(0,6).forEach((x,i)=>{const li=document.createElement('li');if(L.length){li.className='tap';li.tabIndex=0;li.addEventListener('click',()=>openEdit(i))}
     const s1=document.createElement('span'),s2=document.createElement('span');
     s1.textContent=x.d;
     if(x.c&&x.c.rpe){const t=document.createElement('span');t.className='tag';t.textContent='RPE '+x.c.rpe;s1.appendChild(t)}
@@ -646,6 +660,7 @@ function renderPlan(){
   const who=el('div','t-who');
   who.appendChild(el('span',null,pr.level?'Plan for '+LEVELS[pr.level].l:'No profile yet'));
   const ed=el('button','link',pr.level?'Edit about me':'Tell your coach about you');ed.type='button';ed.addEventListener('click',openOnb);who.appendChild(ed);
+  const tb=el('button','link','How it works');tb.type='button';tb.addEventListener('click',openTour);who.appendChild(tb);
   const parts=[q,m];
   if(P.up){const lv=el('div','t-block lvlbox');lv.append(el('div','t-label','Level up'),el('div','lvl-text',P.up.text),el('p','t-tip',P.up.detail));parts.push(lv)}
   b.append(...parts,list,f,...(f._rp?[f._rp]:[]),w,a,who);
@@ -659,6 +674,7 @@ function openOnb(){
 $('onb').addEventListener('submit',e=>{e.preventDefault();
   if(!O.level){$('onbErr').hidden=false;return}
   store.set('rc-profile',Object.assign({},O));renderPlan();window.scrollTo(0,0);
+  if(!store.get('rc-tour'))openTour();
 });
 $('onbSkip').addEventListener('click',()=>{if(!profile())store.set('rc-profile',{});renderPlan()});
 function tab(n){
@@ -671,6 +687,70 @@ $('tabProgress').addEventListener('click',()=>tab('progress'));
 const dayKey=t=>{const d=new Date(t);return d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate()};
 const weekStart=t=>{const d=new Date(t);d.setHours(0,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));return d.getTime()};
 const mins=x=>Math.round((x.w||x.r*(x.t||0))/60);
+function refreshAll(){renderLog();renderPlan();if(!$('pProgress').hidden)renderProgress()}
+function openEdit(i){
+  const L=store.get('rc-log')||[];const x=L[i];if(!x)return;
+  const c=Object.assign({},x.c||{});
+  const el=(t,cl,txt)=>{const e=document.createElement(t);if(cl)e.className=cl;if(txt!=null)e.textContent=txt;return e};
+  let sh=$('editSheet');if(sh)sh.remove();
+  sh=el('div','sheet');sh.id='editSheet';sh.setAttribute('role','dialog');sh.setAttribute('aria-label','Edit session');
+  const card=el('div','sheet-card');
+  card.append(el('div','eq-q','Edit session'),el('p','eq-note',`${x.d} · ${logLine(x)}`));
+  card.appendChild(el('div','t-label','How hard was it?'));
+  const sc=el('div','scale');for(let r=1;r<=10;r++){const b=el('button',null,String(r));b.type='button';b.setAttribute('aria-pressed',c.rpe===r);
+    b.addEventListener('click',()=>{c.rpe=r;[...sc.children].forEach(y=>y.setAttribute('aria-pressed',y===b))});sc.appendChild(b)}
+  card.appendChild(sc);
+  const chipRow=(label,key,opts,multi)=>{card.appendChild(el('div','t-label',label));const g=el('div','chips');
+    opts.forEach(([v,l])=>{const b=el('button',null,l);b.type='button';const cur=[].concat(c[key]||[]);b.setAttribute('aria-pressed',cur.includes(v));
+      b.addEventListener('click',()=>{
+        if(!multi){c[key]=v;[...g.children].forEach(y=>y.setAttribute('aria-pressed',y===b));return}
+        let on=b.getAttribute('aria-pressed')!=='true';
+        if(v==='None'&&on)[...g.children].forEach(y=>y.setAttribute('aria-pressed','false'));
+        else if(on){const n=[...g.children].find(y=>y.textContent==='Nothing');n&&n.setAttribute('aria-pressed','false')}
+        b.setAttribute('aria-pressed',on);c[key]=opts.filter((o,j)=>g.children[j].getAttribute('aria-pressed')==='true').map(o=>o[0]);
+      });g.appendChild(b)});card.appendChild(g)};
+  chipRow('Energy','energy',[['Low','Low'],['OK','OK'],['High','High']],false);
+  chipRow('Anything sore?','sore',[['None','Nothing'],['Shoulders','Shoulders'],['Hands/wrists','Hands / wrists'],['Legs','Legs'],['Back','Back']],true);
+  const nt=el('textarea');nt.rows=2;nt.value=c.note||'';nt.setAttribute('aria-label','Notes');nt.className='edit-note';card.appendChild(nt);
+  const save=el('button','go','Save changes');save.addEventListener('click',()=>{c.note=nt.value.trim();const L2=store.get('rc-log')||[];if(L2[i]){L2[i].c=c;store.set('rc-log',L2)}sh.remove();refreshAll()});
+  const del=el('button','ghost danger','Delete this session');let armed=false;
+  del.addEventListener('click',()=>{if(!armed){armed=true;del.textContent='Tap again to delete for good';return}
+    const L2=store.get('rc-log')||[];L2.splice(i,1);store.set('rc-log',L2);sh.remove();refreshAll()});
+  const x2=el('button','link','Cancel');x2.type='button';x2.addEventListener('click',()=>sh.remove());
+  card.append(save,del,x2);sh.appendChild(card);sh.addEventListener('click',e=>{if(e.target===sh)sh.remove()});
+  document.body.appendChild(sh);
+}
+/* ---------- intro tour ---------- */
+const TOUR=[
+  {k:'Today',h:'Your coach plans every session',p:'Open the app and a full session is ready: warm-up, main rounds with one job each, a finisher and a cool-down.',
+   b:['Tell it what you have today: heavy bag, jump rope','Pick a combo focus to drill, like body shots or defense','Press Start full session']},
+  {k:'During',h:'Keep your gloves on',p:'Everything runs by itself from start to finish.',
+   b:['Bells start and end every round','Combos are called out loud and shown big','Clacks warn you before the bell (10 or 30 sec)','Every rest tells you what comes next']},
+  {k:'After',h:'Four taps teach your coach',p:'Answer the check-in after each session.',
+   b:['Three easy sessions in a row: level up','Sore or tired: an easier day','Wrong answer or extra session? Tap it in Progress to fix it']},
+  {k:'Timer & Progress',h:'Your tools',p:'Two more tabs at the top.',
+   b:['Timer: your own rounds, end-of-round warnings, combo calls and coach voice','Progress: week goal, streak, effort over time and every level-up']}
+];
+function openTour(){
+  let ov=$('tour');if(ov)ov.remove();
+  ov=document.createElement('div');ov.id='tour';ov.className='sheet tour';ov.setAttribute('role','dialog');ov.setAttribute('aria-label','How Round Clock works');
+  const card=document.createElement('div');card.className='sheet-card';ov.appendChild(card);let n=0;
+  const close=()=>{store.set('rc-tour',1);ov.remove()};
+  const draw=()=>{const t=TOUR[n];card.innerHTML='';
+    const k=document.createElement('div');k.className='t-label';k.textContent=`${n+1} of ${TOUR.length} · ${t.k}`;
+    const h=document.createElement('div');h.className='eq-q';h.textContent=t.h;
+    const p=document.createElement('p');p.className='t-why';p.textContent=t.p;
+    const ul=document.createElement('ul');ul.className='tour-list';t.b.forEach(x=>{const li=document.createElement('li');li.textContent=x;ul.appendChild(li)});
+    const dots=document.createElement('div');dots.className='tour-dots';TOUR.forEach((_,j)=>{const d=document.createElement('i');if(j===n)d.className='on';dots.appendChild(d)});
+    const nx=document.createElement('button');nx.className='go';nx.textContent=n<TOUR.length-1?'Next':'Let\'s train';
+    nx.addEventListener('click',()=>{if(n<TOUR.length-1){n++;draw()}else close()});
+    const row=document.createElement('div');row.className='tour-row';
+    const bk=document.createElement('button');bk.className='link';bk.type='button';bk.textContent=n?'Back':'Skip intro';
+    bk.addEventListener('click',()=>{if(n){n--;draw()}else close()});
+    row.append(bk,dots);
+    card.append(k,h,p,ul,nx,row)};
+  draw();document.body.appendChild(ov);
+}
 function renderProgress(){
   const box=$('progBody');box.innerHTML='';
   const el=(t,c,txt)=>{const e=document.createElement(t);if(c)e.className=c;if(txt!=null)e.textContent=txt;return e};
@@ -727,7 +807,12 @@ function renderProgress(){
       r.appendChild(el('small',null,x.u?x.u.detail:`${x.m.rounds} × ${fmt(x.m.round)} · rest ${x.m.rest?fmt(x.m.rest):'none'}`));
       li.append(el('span',null,x.d),r);ul.appendChild(li)});ups.appendChild(ul)}
   else ups.appendChild(el('p','p-sub','No level-ups yet. When a session feels easy three times in a row, the coach makes the main rounds harder and it shows up here.'));
-  box.append(hero,strip,stats,ch,ups);
+  const ss=el('div','t-block');ss.appendChild(el('div','t-label','Sessions · tap to fix'));
+  const sl=el('ul','p-ups p-sess');(store.get('rc-log')||[]).slice(0,30).forEach((x,i)=>{const li=el('li');li.tabIndex=0;
+    const r=el('span','p-up');r.appendChild(el('b',null,logLine(x)));r.appendChild(el('small',null,x.c&&x.c.rpe?'Effort '+x.c.rpe+'/10':'No check-in'));
+    li.append(el('span',null,x.d),r);li.addEventListener('click',()=>openEdit(i));sl.appendChild(li)});
+  ss.appendChild(sl);
+  box.append(hero,strip,stats,ch,ups,ss);
 }
 $('tabToday').addEventListener('click',()=>tab('today'));
 $('tabTimer').addEventListener('click',()=>tab('timer'));
@@ -894,6 +979,8 @@ $('stop').addEventListener('click',()=>{$('ctrls').hidden=true;$('confirm').hidd
 $('noStop').addEventListener('click',()=>{$('confirm').hidden=true;$('ctrls').hidden=false});
 $('yesStop').addEventListener('click',()=>{const ph=R.list[R.i];finish(false)});
 
+$('tourLink').addEventListener('click',openTour);
+if(profile()&&profile().level&&!store.get('rc-tour'))setTimeout(openTour,400);
 renderLog();renderPlan();render();tab(P||!profile()?'today':'timer');
 })();
 </script>
