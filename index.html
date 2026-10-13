@@ -226,7 +226,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 
   <section class="log"><h2>Recent sessions</h2><ul id="log"></ul></section>
   </div>
-  <p class="ver">Round Clock · updated 13 Oct 2026 · coach voice</p>
+  <p class="ver">Round Clock · updated 13 Oct 2026 · coach voice 2</p>
 </main>
 
 <!-- RUN -->
@@ -390,14 +390,14 @@ $('voiceTest').addEventListener('click',()=>{mediaMode();loadClips().then(()=>sp
 const CLIP={},CLIPW=['one','two','three','four','five','six','slip','roll','pivot'];let clipsP=null;
 function loadClips(){
   if(clipsP)return clipsP;const a=audio();if(!a||!window.fetch)return Promise.resolve();
-  clipsP=Promise.all(CLIPW.map(w=>fetch('audio/'+w+'.mp3').then(r=>{if(!r.ok)throw 0;return r.arrayBuffer()})
+  clipsP=Promise.all(CLIPW.map(w=>fetch('audio/v2/'+w+'.mp3').then(r=>{if(!r.ok)throw 0;return r.arrayBuffer()})
     .then(b=>new Promise((res,rej)=>a.decodeAudioData(b,res,rej))).then(buf=>{CLIP[w]=buf}).catch(()=>{})));
   return clipsP;
 }
 function playClips(words){
   const a=audio();if(!a||S.voiceName||!words.every(w=>CLIP[w]))return false;
   let t=a.currentTime+0.02;
-  words.forEach(w=>{const s=a.createBufferSource(),g=a.createGain();g.gain.value=1.5;s.buffer=CLIP[w];s.connect(g).connect(a.destination);s.start(t);t+=CLIP[w].duration+0.06});
+  words.forEach(w=>{const s=a.createBufferSource(),g=a.createGain();g.gain.value=1;s.buffer=CLIP[w];s.connect(g).connect(a.destination);s.start(t);t+=CLIP[w].duration+0.04});
   const n=$('voiceNow');if(n)n.textContent='Using: built-in coach voice';
   return true;
 }
