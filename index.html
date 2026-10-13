@@ -59,6 +59,9 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 .t-actions .go{width:100%}
 .onb-intro{margin:0;color:var(--muted);line-height:1.5}
 .onb-err{margin:0;color:var(--amber);font-weight:600}
+.vsel{display:flex;gap:8px;align-items:center;min-width:0}
+.vsel select{font:inherit;font-size:.9rem;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:9px 8px;max-width:10.5rem;min-width:0}
+.vsel button{background:none;border:1px solid var(--line);border-radius:6px;padding:9px 12px;font-weight:600}
 .hint{font-weight:400;color:var(--muted);font-size:.85rem;margin-left:4px}
 .t-eq{display:flex;flex-direction:column;gap:10px}
 .t-who{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:.9rem;color:var(--muted)}
@@ -214,6 +217,8 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
       <div class="toggle"><input type="checkbox" id="combos" checked></div></div>
     <div class="row"><label for="voice">Say combos out loud<em>Also used in Today's plan</em></label>
       <div class="toggle"><input type="checkbox" id="voice" checked></div></div>
+    <div class="row"><label for="voicePick">Coach voice<em>Pick one that sounds right</em></label>
+      <div class="vsel"><select id="voicePick"><option value="">Automatic</option></select><button type="button" id="voiceTest">Test</button></div></div>
   </div>
 
   <div class="total"><span>Total session</span><b id="total"></b></div>
@@ -271,7 +276,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 <script>
 (function(){
 const LIM={rounds:[1,30],round:[15,600],rest:[0,300],prep:[0,30]};
-const S={rounds:6,round:180,rest:60,prep:10,warn:true,combos:true,voice:true};
+const S={rounds:6,round:180,rest:60,prep:10,warn:true,combos:true,voice:true,voiceName:''};
 const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 Object.assign(S,store.get('rc-settings')||{});
 const $=id=>document.getElementById(id);
@@ -360,8 +365,26 @@ function comboTier(){if(R.on&&R.list[R.i]&&R.list[R.i].combos==='light')return '
 function comboGap(){const base={basic:7,mid:6,adv:4.5}[comboTier()];return base+Math.random()*2-1}
 let lastCombo='';
 function pickCombo(){const L=COMBOS[comboTier()];let c;do{c=L[Math.floor(Math.random()*L.length)]}while(c===lastCombo&&L.length>1);lastCombo=c;return c}
-function say(t){try{if(!S.voice||!('speechSynthesis' in window))return false;speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(t);u.rate=1.15;u.lang='en-US';speechSynthesis.speak(u);return true}catch(e){return false}}
+const enVoices=()=>{try{return speechSynthesis.getVoices().filter(v=>/^en[-_]/i.test(v.lang))}catch(e){return []}};
+function pickVoice(){
+  const V=enVoices();if(!V.length)return null;
+  if(S.voiceName){const m=V.find(v=>v.name===S.voiceName);if(m)return m}
+  const pref=['Daniel','Samantha','Karen','Moira','Arthur','Google UK English Male','Google US English','Aaron','Alex'];
+  for(const p of pref){const m=V.find(v=>v.name.startsWith(p));if(m)return m}
+  return V.find(v=>/en[-_](US|GB)/i.test(v.lang))||V[0];
+}
+function say(t,force){try{if((!S.voice&&!force)||!('speechSynthesis' in window))return false;speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(t);const v=pickVoice();if(v){u.voice=v;u.lang=v.lang}else u.lang='en-US';
+  u.rate=1.1;speechSynthesis.speak(u);return true}catch(e){return false}}
+function fillVoices(){
+  const sel=$('voicePick');if(!sel)return;const V=enVoices();
+  sel.innerHTML='';const a=document.createElement('option');a.value='';a.textContent='Automatic';sel.appendChild(a);
+  V.forEach(v=>{const o=document.createElement('option');o.value=v.name;o.textContent=v.name.replace(/\s*\(.*\)/,'')+' · '+v.lang.slice(-2);sel.appendChild(o)});
+  sel.value=V.some(v=>v.name===S.voiceName)?S.voiceName:'';
+}
+try{fillVoices();speechSynthesis.addEventListener('voiceschanged',fillVoices)}catch(e){}
+$('voicePick').addEventListener('change',e=>{S.voiceName=e.target.value;render();say('one, two, three',true)});
+$('voiceTest').addEventListener('click',()=>{say('one, two, three. Jab, cross, hook.',true)});
 function callCombo(){
   const c=pickCombo(),parts=c.split('-');
   $('comboN').textContent=c;
