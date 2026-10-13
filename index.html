@@ -182,6 +182,10 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 .eq-note{margin:0;font-size:.92rem;color:var(--muted);line-height:1.45}
 .sheet{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center;padding:16px}
 .sheet-card{width:100%;max-width:460px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 16px calc(20px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px;animation:lvlpop .3s ease-out}
+.t-rounds{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.t-rounds li{display:flex;align-items:center;gap:10px;font-weight:600;font-size:1.02rem}
+.t-rounds li.hl{color:var(--amber)}
+.t-rn{display:inline-grid;place-items:center;width:1.7rem;height:1.7rem;border-radius:50%;border:1px solid var(--line);font-family:var(--display);font-weight:800;font-size:.95rem;flex:none}
 .prog{display:flex;flex-direction:column;gap:18px}
 .p-hero{display:flex;flex-direction:column;gap:6px}
 .p-big{font-family:var(--display);font-weight:900;font-size:clamp(3rem,14vw,4.2rem);line-height:.9;font-variant-numeric:tabular-nums}
@@ -278,7 +282,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
   <div class="panel" id="pProgress" role="tabpanel" aria-labelledby="tabProgress" hidden>
     <div id="progBody" class="prog"></div>
   </div>
-  <p class="ver">Round Clock · updated 13 Oct 2026 · equipment</p>
+  <p class="ver">Round Clock · updated 13 Oct 2026 · round themes</p>
 </main>
 
 <!-- RUN -->
@@ -442,9 +446,35 @@ const COMBOS={
   adv:['1-2-3-2','1-1-2-3','1-2-5-2','2-3-2','1-2-roll-2-3','1-6-3-2','slip-2-3-2','3-3-2','1-2-3-pivot','1-2-3-4','1-1-2-roll-3-2','5-2-3']
 };
 function comboTier(){if(R.on&&R.list[R.i]&&R.list[R.i].combos==='light')return 'basic';const l=(profile()||{}).level;return l==='never'||l==='beg'?'basic':(l==='adv'||l==='pro')?'adv':'mid'}
-function comboGap(){const base={basic:7,mid:6,adv:4.5}[comboTier()];return base+Math.random()*2-1}
+function comboGap(){const base={basic:7,mid:6,adv:4.5}[comboTier()];const th=R.on&&R.list[R.i]&&R.list[R.i].theme;return Math.max(3,base+(th&&th.gap||0)+Math.random()*2-1)}
+/* ---------- round themes ---------- */
+const levelTier=()=>{const l=(profile()||{}).level;return l==='never'||l==='beg'?'basic':(l==='adv'||l==='pro')?'adv':'mid'};
+const THEMES={
+  jab:{name:'Jab work',cue:'Lead with the jab. Double it, triple it, snap it back.',c:{basic:['1','1-1','1-1-2'],mid:['1','1-1','1-1-2','1-1-1','1b-1'],adv:['1','1-1','1-1-2','1b-1-2','1-1-1-2']}},
+  straight:{name:'1-2 work',cue:'Jab, cross, then hands straight back to your chin.',c:{basic:['1-2','1-1-2','1-2-1','2-1-2'],mid:['1-2','1-1-2','1-2-1-2'],adv:['1-2','1-1-2','1-2-1-2']}},
+  body:{name:'Body shots',cue:'Go downstairs. Bend your knees, not your back. ↓ means to the body.',c:{basic:['1-2b','1b-2','1-1b'],mid:['1-2b','3b-2','1-2-3b','2b-3'],adv:['1-2b-3','3b-3','1-1b-2-3','2b-3-2','5-3b-2']}},
+  defense:{name:'Defense',cue:'After every combo, slip or roll out. Hands home.',c:{basic:['1-slip','1-2-slip','slip-2'],mid:['1-2-slip','1-2-roll','slip-2','1-2-slip-2','roll-3-2'],adv:['1-2-slip-2','1-2-roll-2-3','slip-2-3-2','3-roll-3-2','1-1-slip-2-pivot']}},
+  hooks:{name:'Hooks & uppercuts',cue:'Turn the hips. Short, tight shots. Stay on balance.',c:{basic:['1-2','2-3'],mid:['3','3-2','1-2-3','5-2','6-3'],adv:['3-3-2','1-6-3-2','5-2-3','1-2-5-2','6-3-2-3']}},
+  power:{name:'Power',cue:'Fewer punches, full power. Reset your feet between combos.',gap:2,c:{basic:['2','1-2'],mid:['2','1-2','3-2','1-2-3'],adv:['2','1-2','3-2','2-3-2','1-2-3-2']}},
+  speed:{name:'Speed',cue:'Fast hands, light power. Keep it flowing.',gap:-1.5,c:{basic:['1-2','1-1-2'],mid:['1-2','1-2-1-2','1-1-2','3-2-3'],adv:['1-2-1-2','1-2-3-2','3-2-3-2','1-1-2-3-2']}},
+  all:{name:'Everything',cue:'Last round. Mix it all and empty the tank.',c:null}
+};
+Object.keys(THEMES).forEach(k=>{THEMES[k].key=k});
+const FOCUS_OPTS={basic:[['balanced','Balanced'],['straight','1-2 work'],['body','Body'],['defense','Defense']],
+  full:[['balanced','Balanced'],['body','Body'],['defense','Defense'],['hooks','Hooks'],['power','Power'],['speed','Speed']]};
+const comboFocus=()=>store.get('rc-cfocus')||'balanced';
+function makeThemes(n){
+  const tier=levelTier();if(n<=1)return [THEMES.all];
+  const rot=tier==='basic'?['straight','defense','body']:['body','defense','hooks','power','speed'];
+  const f=comboFocus();const focus=rot.includes(f)?f:null;
+  let order=rot.filter(k=>k!==focus);const off=Math.floor(Date.now()/864e5)%order.length;order=order.slice(off).concat(order.slice(0,off));
+  const seq=[THEMES.jab];let j=0;
+  for(let i=0;i<n-2;i++)seq.push(THEMES[focus&&i%2===0?focus:order[j++%order.length]]);
+  seq.push(THEMES.all);return seq;
+}
+function themeCombos(th){const t=levelTier();return th&&th.c?(th.c[t]||th.c.mid):COMBOS[t]}
 let lastCombo='';
-function pickCombo(){const L=COMBOS[comboTier()];let c;do{c=L[Math.floor(Math.random()*L.length)]}while(c===lastCombo&&L.length>1);lastCombo=c;return c}
+function pickCombo(){const ph=R.on&&R.list[R.i];const L=ph&&ph.theme&&ph.combos!=='light'?themeCombos(ph.theme):COMBOS[comboTier()];let c;do{c=L[Math.floor(Math.random()*L.length)]}while(c===lastCombo&&L.length>1);lastCombo=c;return c}
 const enVoices=()=>{try{return speechSynthesis.getVoices().filter(v=>/^en[-_]/i.test(v.lang))}catch(e){return []}};
 function pickVoice(){
   const V=enVoices();if(!V.length)return null;
@@ -479,7 +509,8 @@ function loadClips(){
 }
 function playClips(words){
   const c=coachVoice();const CLIP=c?CLIPS[c]:{};
-  const a=audio();if(!a||!c||!words.every(w=>CLIP[w]))return false;
+  const a=audio();if(!a||!c||!CLIP.one)return false;
+  words=words.filter(w=>CLIP[w]);if(!words.length)return false;
   let t=a.currentTime+0.02;
   words.forEach(w=>{const s=a.createBufferSource(),g=a.createGain();g.gain.value=1;s.buffer=CLIP[w];s.connect(g).connect(a.destination);s.start(t);t+=CLIP[w].duration+0.28});
   const n=$('voiceNow');if(n)n.textContent='Using: '+({carl:'Coach Carl',ryan:'Generated male',lessac:'Generated female'})[c];
@@ -490,11 +521,12 @@ function speakCombo(words,force){
   return playClips(words)||say(words.join(', '),force);
 }
 function callCombo(){
-  const c=pickCombo(),parts=c.split('-');
-  $('comboN').textContent=c;
-  $('comboW').textContent=parts.map(p=>PUNCH[p]?PUNCH[p][1]:p).join(' · ');
+  const c=pickCombo(),parts=c.split('-').map(p=>{const body=/^\db$/.test(p),k=body?p[0]:p;
+    return PUNCH[k]?{num:k+(body?'↓':''),word:(body?'body ':'')+PUNCH[k][1],say:body?[PUNCH[k][0],'body']:[PUNCH[k][0]]}:{num:p,word:p,say:[p]}});
+  $('comboN').textContent=parts.map(x=>x.num).join('-');
+  $('comboW').textContent=parts.map(x=>x.word).join(' · ');
   const box=$('combo');box.classList.remove('flash');void box.offsetWidth;box.classList.add('flash');
-  if(!speakCombo(parts.map(p=>PUNCH[p]?PUNCH[p][0]:p)))beep(true);
+  if(!speakCombo([].concat(...parts.map(x=>x.say))))beep(true);
 }
 function clearCombo(){$('comboN').textContent='';$('comboW').textContent=''}
 function tipFor(f){return (isBasic()?TIPS_BASIC:TIPS_ADV)[f]}
@@ -508,7 +540,8 @@ function blocksFor(main,focus,kind){
     tip:'No rope: skip on the spot, jumping jacks and high knees. Stay light.'});
   if(focus!=='Shadowboxing')B.push({name:'Shadowboxing',stage:'Warm-up',rounds:shadow[0],round:shadow[1],rest:30,gap:60,combos:'light',
     tip:'Loose and light. Get the shoulders and hips moving. No power yet.'});
-  B.push({name:focus,stage:'Main',rounds:main.rounds,round:main.round,rest:main.rest,gap:60,tip:tipFor(focus),main:true,combos:focus==='Shadowboxing'||focus==='Bag'});
+  const hasCombos=focus==='Shadowboxing'||focus==='Bag';
+  B.push({name:focus,stage:'Main',rounds:main.rounds,round:main.round,rest:main.rest,gap:60,tip:tipFor(focus),main:true,combos:hasCombos,themes:hasCombos?makeThemes(main.rounds):null});
   let fr=FIN[lv][0];if(kind==='ease')fr=Math.max(1,fr-1);
   B.push({name:focus==='Conditioning'?'Core':'Strength & core',stage:'Finisher',rounds:fr,round:FIN[lv][1],rest:30,gap:30,
     tip:basic?'Pushups, sit-ups, plank. Your own pace, good form first.':'Pushups, sit-ups, plank, burpees. Keep moving the whole round.'});
@@ -590,6 +623,18 @@ function renderPlan(){
     li.append(el('span','t-stage',x.stage),el('span','t-name',x.name),el('span','t-dim',`${x.rounds} × ${fmt(x.round)}`));
     list.appendChild(li)});
   const f=el('div','t-block');f.append(el('div','t-label','Main focus'),el('div','t-focus',P.focus),el('p','t-tip',tipFor(P.focus)));
+  const mb=P.blocks.find(x=>x.main);
+  if(mb&&mb.themes){
+    const rp=el('div','t-block');rp.appendChild(el('div','t-label','Main rounds, one job each'));
+    const ol=el('ol','t-rounds');mb.themes.forEach((t,i)=>{const li=el('li',t.key===comboFocus()?'hl':'');li.append(el('span','t-rn',String(i+1)),el('span',null,t.name));ol.appendChild(li)});
+    rp.appendChild(ol);
+    rp.appendChild(el('div','t-label','Combo focus'));
+    const fc=el('div','chips');(levelTier()==='basic'?FOCUS_OPTS.basic:FOCUS_OPTS.full).forEach(([k,l])=>{const bt=el('button',null,l);bt.type='button';
+      bt.setAttribute('aria-pressed',comboFocus()===k);bt.addEventListener('click',()=>{store.set('rc-cfocus',k);renderPlan()});fc.appendChild(bt)});
+    rp.appendChild(fc);
+    rp.appendChild(el('p','eq-note','Pick what you want to drill. Every other middle round becomes that theme, and its combos are called.'));
+    f._rp=rp;
+  }
   if(P.blocks.some(x=>x.combos))f.appendChild(el('p','t-legend','Combo calls in shadowboxing and bag rounds: 1 jab · 2 cross · 3 hook · 4 rear hook · 5 uppercut · 6 rear uppercut'));
   const w=el('div','t-block');w.append(el('div','t-label','Why this plan'),el('p','t-why',P.why));
   const a=el('div','t-actions');
@@ -603,7 +648,7 @@ function renderPlan(){
   const ed=el('button','link',pr.level?'Edit about me':'Tell your coach about you');ed.type='button';ed.addEventListener('click',openOnb);who.appendChild(ed);
   const parts=[q,m];
   if(P.up){const lv=el('div','t-block lvlbox');lv.append(el('div','t-label','Level up'),el('div','lvl-text',P.up.text),el('p','t-tip',P.up.detail));parts.push(lv)}
-  b.append(...parts,list,f,w,a,who);
+  b.append(...parts,list,f,...(f._rp?[f._rp]:[]),w,a,who);
 }
 function openOnb(){
   const pr=profile()||{};Object.keys(O).forEach(k=>delete O[k]);
@@ -746,7 +791,8 @@ function build(B){
   const L=[];if(S.prep)L.push({k:'prep',s:S.prep,idx:0});
   const total=blocksRounds(B);let idx=0;
   B.forEach((b,bi)=>{for(let r=1;r<=b.rounds;r++){idx++;
-    L.push({k:'round',s:b.round,n:r,of:b.rounds,name:b.name,tip:b.tip,cool:!!b.cool,combos:b.combos||false,idx,total});
+    const th=b.themes?b.themes[r-1]:null;
+    L.push({k:'round',s:b.round,n:r,of:b.rounds,name:b.name,tip:th?th.cue:b.tip,theme:th,cool:!!b.cool,combos:b.combos||false,idx,total});
     if(bi===B.length-1&&r===b.rounds)continue;
     const rs=r<b.rounds?b.rest:b.gap;if(rs>0)L.push({k:'rest',s:rs,idx})}});
   return L;
@@ -764,7 +810,7 @@ function start(mode){
   const p=$('pips');p.innerHTML='';for(let r=0;r<R.total;r++)p.appendChild(document.createElement('i'));
   show('run');wake();next();clearInterval(R.timer);R.timer=setInterval(tick,100);
 }
-const roundLabel=x=>x.name?`${x.name} ${x.n}/${x.of}`:`Round ${x.n} / ${x.of}`;
+const roundLabel=x=>x.theme?`${x.theme.name} ${x.n}/${x.of}`:x.name?`${x.name} ${x.n}/${x.of}`:`Round ${x.n} / ${x.of}`;
 function next(){
   const cur=R.list[R.i];
   if(cur&&cur.k==='round'){R.done++;R.work+=Math.min(cur.s,Math.max(0,cur.s-Math.max(0,(R.paused?R.left:R.end-performance.now())/1000)))}
@@ -774,7 +820,7 @@ function next(){
   const run=$('run');run.dataset.phase=ph.k;run.classList.remove('warn');
   const up=R.list.slice(R.i+1).find(x=>x.k==='round');
   if(ph.k==='round'){$('phase').textContent=roundLabel(ph);$('cue').textContent=ph.tip;bell(ph.cool?1:3)}
-  else{$('phase').textContent=ph.k==='rest'?'Rest':'Get ready';$('cue').textContent=up&&up.name?`Up next: ${up.name}. ${up.tip}`:'';if(ph.k==='rest')bell(1)}
+  else{$('phase').textContent=ph.k==='rest'?'Rest':'Get ready';$('cue').textContent=up&&up.name?`Up next: ${up.theme?up.theme.name:up.name}. ${up.tip}`:'';if(ph.k==='rest')bell(1)}
   $('next').textContent=up?`Next: ${roundLabel(up)} · ${fmt(up.s)}`:(ph.cool?'Last one. Breathe and stretch.':'Last round. Empty the tank.');
   [...$('pips').children].forEach((el,j)=>{const n=j+1;
     el.className=(ph.k==='round'?n<ph.idx:n<=ph.idx)?'done':(ph.k==='round'&&n===ph.idx?'now':'')});
