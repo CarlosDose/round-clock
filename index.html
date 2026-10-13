@@ -217,7 +217,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
       <div class="toggle"><input type="checkbox" id="combos" checked></div></div>
     <div class="row"><label for="voice">Say combos out loud<em>Also used in Today's plan</em></label>
       <div class="toggle"><input type="checkbox" id="voice" checked></div></div>
-    <div class="row"><label for="voicePick">Coach voice<em>Pick one that sounds right</em></label>
+    <div class="row"><label for="voicePick">Coach voice<em id="voiceNow">Pick one that sounds right</em></label>
       <div class="vsel"><select id="voicePick"><option value="">Automatic</option></select><button type="button" id="voiceTest">Test</button></div></div>
   </div>
 
@@ -226,7 +226,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 
   <section class="log"><h2>Recent sessions</h2><ul id="log"></ul></section>
   </div>
-  <p class="ver">Round Clock · updated 13 Oct 2026</p>
+  <p class="ver">Round Clock · updated 13 Oct 2026 · voice fix 2</p>
 </main>
 
 <!-- RUN -->
@@ -375,14 +375,15 @@ function pickVoice(){
 }
 function say(t,force){try{if((!S.voice&&!force)||!('speechSynthesis' in window))return false;speechSynthesis.cancel();
   const u=new SpeechSynthesisUtterance(t);const v=pickVoice();if(v){u.voice=v;u.lang=v.lang}else u.lang='en-US';
-  u.rate=1.1;speechSynthesis.speak(u);return true}catch(e){return false}}
+  u.rate=1.1;speechSynthesis.speak(u);showVoice(v);return true}catch(e){return false}}
+function showVoice(v){const n=$('voiceNow');if(n)n.textContent=v?'Using: '+v.name.replace(/\s*\(.*\)/,'')+' ('+v.lang+')':'No English voice found on this phone';}
 function fillVoices(){
   const sel=$('voicePick');if(!sel)return;const V=enVoices();
   sel.innerHTML='';const a=document.createElement('option');a.value='';a.textContent='Automatic';sel.appendChild(a);
   V.forEach(v=>{const o=document.createElement('option');o.value=v.name;o.textContent=v.name.replace(/\s*\(.*\)/,'')+' · '+v.lang.slice(-2);sel.appendChild(o)});
   sel.value=V.some(v=>v.name===S.voiceName)?S.voiceName:'';
 }
-try{fillVoices();speechSynthesis.addEventListener('voiceschanged',fillVoices)}catch(e){}
+try{fillVoices();speechSynthesis.addEventListener('voiceschanged',fillVoices);setTimeout(fillVoices,800);setTimeout(fillVoices,2500)}catch(e){}
 $('voicePick').addEventListener('change',e=>{S.voiceName=e.target.value;render();say('one, two, three',true)});
 $('voiceTest').addEventListener('click',()=>{say('one, two, three. Jab, cross, hook.',true)});
 function callCombo(){
