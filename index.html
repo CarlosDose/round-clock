@@ -37,8 +37,8 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 .brand h1{font-family:var(--display);font-weight:900;font-size:2.4rem;letter-spacing:.02em;text-transform:uppercase;margin:0;line-height:1}
 .brand h1 span{color:var(--red)}
 .brand small{color:var(--muted);font-size:.85rem}
-.tabs{display:grid;grid-template-columns:repeat(3,1fr);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px;gap:4px}
-.tabs button{background:none;border:0;border-radius:7px;padding:12px;font-family:var(--display);font-weight:800;font-size:1.15rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px;gap:4px}
+.tabs button{background:none;border:0;border-radius:7px;padding:12px;font-family:var(--display);font-weight:800;font-size:clamp(.82rem,3.6vw,1rem);text-transform:uppercase;letter-spacing:.02em;color:var(--muted);padding:12px 2px;min-width:0}
 .tabs button[aria-selected="true"]{background:var(--text);color:var(--ground)}
 .panel{display:flex;flex-direction:column;gap:20px}
 .today{display:flex;flex-direction:column;gap:16px}
@@ -199,6 +199,21 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 .tour-dots i.on{background:var(--amber)}
 #tourLink{align-self:center;margin-top:8px}
 .t-who{flex-wrap:wrap}
+.t-list li.tap,.t-rounds li.tap{cursor:pointer}
+.t-list li.tap .t-name::after,.t-rounds li.tap span:last-child::after{content:' ›';color:var(--muted)}
+.d-links{display:flex;flex-wrap:wrap;gap:4px 16px}
+.d-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.d-list li{display:flex;flex-direction:column;gap:2px;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.d-list li:last-child{border-bottom:0}
+.d-list li b{font-size:1.08rem}
+.d-list li b::after{content:' ›';color:var(--muted)}
+.d-list li span{font-size:.9rem;color:var(--muted);line-height:1.4}
+.d-vis{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;aspect-ratio:16/9;max-width:100%;border:1px dashed var(--line);border-radius:10px;background:var(--ground)}
+.d-vis b{font-family:var(--display);font-weight:900;font-size:3rem;color:var(--amber);line-height:1}
+.d-vis span{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.d-steps,.d-miss{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:8px;line-height:1.45}
+.d-steps li::marker{color:var(--amber);font-weight:700}
+.d-miss li::marker{color:var(--red)}
 .prog{display:flex;flex-direction:column;gap:18px}
 .p-hero{display:flex;flex-direction:column;gap:6px}
 .p-big{font-family:var(--display);font-weight:900;font-size:clamp(3rem,14vw,4.2rem);line-height:.9;font-variant-numeric:tabular-nums}
@@ -236,6 +251,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
   <nav class="tabs" role="tablist" aria-label="Pages">
     <button role="tab" id="tabToday" aria-controls="pToday">Today</button>
     <button role="tab" id="tabTimer" aria-controls="pTimer">Timer</button>
+    <button role="tab" id="tabDrills" aria-controls="pDrills">Drills</button>
     <button role="tab" id="tabProgress" aria-controls="pProgress">Progress</button>
   </nav>
 
@@ -292,11 +308,14 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 
   <section class="log"><h2>Recent sessions</h2><ul id="log"></ul></section>
   </div>
+  <div class="panel" id="pDrills" role="tabpanel" aria-labelledby="tabDrills" hidden>
+    <div id="drillBody" class="prog"></div>
+  </div>
   <div class="panel" id="pProgress" role="tabpanel" aria-labelledby="tabProgress" hidden>
     <div id="progBody" class="prog"></div>
   </div>
   <button type="button" class="link" id="tourLink">How Round Clock works</button>
-  <p class="ver">Round Clock · updated 13 Oct 2026 · fix + intro</p>
+  <p class="ver">Round Clock · updated 13 Oct 2026 · drills</p>
 </main>
 
 <!-- RUN -->
@@ -635,12 +654,14 @@ function renderPlan(){
   const list=el('ol','t-list');
   P.blocks.forEach(x=>{const li=el('li',x.main?'main':'');
     li.append(el('span','t-stage',x.stage),el('span','t-name',x.name),el('span','t-dim',`${x.rounds} × ${fmt(x.round)}`));
+    const did=DRILL_BY_BLOCK[x.name];if(did){li.classList.add('tap');li.tabIndex=0;li.addEventListener('click',()=>openDrill(did))}
     list.appendChild(li)});
   const f=el('div','t-block');f.append(el('div','t-label','Main focus'),el('div','t-focus',P.focus),el('p','t-tip',tipFor(P.focus)));
   const mb=P.blocks.find(x=>x.main);
   if(mb&&mb.themes){
     const rp=el('div','t-block');rp.appendChild(el('div','t-label','Main rounds, one job each'));
-    const ol=el('ol','t-rounds');mb.themes.forEach((t,i)=>{const li=el('li',t.key===comboFocus()?'hl':'');li.append(el('span','t-rn',String(i+1)),el('span',null,t.name));ol.appendChild(li)});
+    const TD={jab:'jab',straight:'cross',body:'body',defense:'slip',hooks:'hook',power:'cross',speed:'jab',all:'shadow'};
+    const ol=el('ol','t-rounds');mb.themes.forEach((t,i)=>{const li=el('li',t.key===comboFocus()?'hl':'');li.classList.add('tap');li.addEventListener('click',()=>openDrill(TD[t.key]));li.append(el('span','t-rn',String(i+1)),el('span',null,t.name));ol.appendChild(li)});
     rp.appendChild(ol);
     rp.appendChild(el('div','t-label','Combo focus'));
     const fc=el('div','chips');(levelTier()==='basic'?FOCUS_OPTS.basic:FOCUS_OPTS.full).forEach(([k,l])=>{const bt=el('button',null,l);bt.type='button';
@@ -650,6 +671,10 @@ function renderPlan(){
     f._rp=rp;
   }
   if(P.blocks.some(x=>x.combos))f.appendChild(el('p','t-legend','Combo calls in shadowboxing and bag rounds: 1 jab · 2 cross · 3 hook · 4 rear hook · 5 uppercut · 6 rear uppercut'));
+  const hl=el('div','d-links');
+  if(DRILL_BY_BLOCK[P.focus]){const b1=el('button','link','How to: '+P.focus.toLowerCase());b1.type='button';b1.addEventListener('click',()=>openDrill(DRILL_BY_BLOCK[P.focus]));hl.appendChild(b1)}
+  if(P.blocks.some(x=>x.combos)){const b2=el('button','link','How to throw each punch');b2.type='button';b2.addEventListener('click',()=>{drillCat='Punches';tab('drills');window.scrollTo(0,0)});hl.appendChild(b2)}
+  f.appendChild(hl);
   const w=el('div','t-block');w.append(el('div','t-label','Why this plan'),el('p','t-why',P.why));
   const a=el('div','t-actions');
   const go=el('button','go','Start full session');
@@ -678,15 +703,179 @@ $('onb').addEventListener('submit',e=>{e.preventDefault();
 });
 $('onbSkip').addEventListener('click',()=>{if(!profile())store.set('rc-profile',{});renderPlan()});
 function tab(n){
-  [['today','tabToday','pToday'],['timer','tabTimer','pTimer'],['progress','tabProgress','pProgress']].forEach(([k,b,p])=>{
+  [['today','tabToday','pToday'],['timer','tabTimer','pTimer'],['drills','tabDrills','pDrills'],['progress','tabProgress','pProgress']].forEach(([k,b,p])=>{
     $(b).setAttribute('aria-selected',k===n);$(p).hidden=k!==n});
   if(n==='progress')renderProgress();
+  if(n==='drills')renderDrills();
 }
 $('tabProgress').addEventListener('click',()=>tab('progress'));
+$('tabDrills').addEventListener('click',()=>tab('drills'));
 /* ---------- progress ---------- */
 const dayKey=t=>{const d=new Date(t);return d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate()};
 const weekStart=t=>{const d=new Date(t);d.setHours(0,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));return d.getTime()};
 const mins=x=>Math.round((x.w||x.r*(x.t||0))/60);
+/* ---------- drills library ---------- */
+const DRILL_CATS=['Basics','Punches','Defense','Footwork','Session drills','Strength & core','Cool-down'];
+const DRILLS=[
+ {id:'stance',cat:'Basics',name:'Stance',what:'Your base for everything. Balanced, ready to punch, move and defend.',
+  steps:['Stand with feet about shoulder-width apart.','Step your rear foot back so your lead foot points forward and your rear foot is angled out about 45°.','Knees slightly bent, weight split evenly, heel of the rear foot a little off the floor.','Turn your hips and shoulders slightly sideways so you are a narrower target.'],
+  mistakes:['Feet in one line (easy to push off balance)','Standing tall with straight legs','Weight all on the front foot'],
+  cue:'Light on your feet, like you could move any direction right now.',note:'Orthodox (right-handed) shown. Southpaws mirror everything.'},
+ {id:'guard',cat:'Basics',name:'Guard',what:'Where your hands live when you are not punching.',
+  steps:['Rear fist against your cheek, knuckles at eye level.','Lead fist a bit forward, at eye height, ready to jab.','Elbows in, covering your ribs.','Chin down, eyes up, looking through your gloves.'],
+  mistakes:['Dropping the hands when tired','Elbows flaring out','Chin up in the air'],
+  cue:'Every punch comes home to the guard.'},
+ {id:'breathing',cat:'Basics',name:'Breathing',what:'Short breaths out on every punch keep you relaxed and stop you gassing out.',
+  steps:['Breathe out sharply through your nose or mouth on every punch ("tss").','Breathe in between combos, not during.','In rest, slow deep breaths: in through the nose, long out through the mouth.'],
+  mistakes:['Holding your breath through combos','Tensing shoulders and jaw'],
+  cue:'Punch, breathe out. Every time.'},
+
+ {id:'jab',cat:'Punches',num:'1',name:'Jab (1)',what:'Lead-hand straight punch. Fast, long, and it sets up everything else.',
+  steps:['From your stance, extend the lead fist straight at the target.','Turn the fist over at the end so the palm faces down.','Lead shoulder comes up to protect your chin.','Snap it straight back to the guard just as fast.'],
+  mistakes:['Pulling it back low (counter right hand comes in)','Leaning forward with the head','Telegraphing by dropping the hand first'],
+  cue:'Out fast, back faster.'},
+ {id:'cross',cat:'Punches',num:'2',name:'Cross (2)',what:'Rear-hand straight punch. Your main power shot.',
+  steps:['Push off the ball of the rear foot and turn the rear hip forward.','Rotate the shoulders and extend the rear fist straight to the target.','Turn the fist over, chin tucked behind the shoulder.','Lead hand stays home on your cheek. Return straight back.'],
+  mistakes:['Arm-only punching without turning the hips','Lead hand drops while you throw','Overreaching past your balance'],
+  cue:'Turn the back foot like you are squashing a bug.'},
+ {id:'hook',cat:'Punches',num:'3',name:'Lead hook (3)',what:'Short, curved punch with the lead hand. Big power from the hips.',
+  steps:['Shift a little weight to the lead foot.','Elbow up to shoulder height, arm bent about 90°.','Pivot the lead foot and turn hips and shoulders together.','The fist travels across; stop at the centre, do not follow through.','Rear hand stays glued to your cheek.'],
+  mistakes:['Swinging wide and looping','Arm only, no hip turn','Dropping the rear hand'],
+  cue:'Short and tight. The turn does the work.'},
+ {id:'rhook',cat:'Punches',num:'4',name:'Rear hook (4)',what:'Hook with the rear hand. Often thrown after a lead hook or to the body.',
+  steps:['Turn on the rear foot and rotate the rear hip forward.','Elbow up, arm bent, fist travels in a short arc.','Lead hand guards your chin.','Return to stance straight after.'],
+  mistakes:['Too wide (easy to see)','Losing balance forward'],
+  cue:'Same as the lead hook, mirrored. Keep it compact.'},
+ {id:'upper',cat:'Punches',num:'5',name:'Lead uppercut (5)',what:'Upward punch with the lead hand. Close range, through the guard.',
+  steps:['Dip slightly by bending the lead knee.','Drive up from the legs, turning the lead hip.','Fist travels up, palm facing you, elbow bent.','Stop at chin height and return.'],
+  mistakes:['Dropping the hand low first (telegraph)','Throwing from too far away'],
+  cue:'Legs first, then the fist.'},
+ {id:'rupper',cat:'Punches',num:'6',name:'Rear uppercut (6)',what:'Upward punch with the rear hand. Strong finisher after a 1 or 3.',
+  steps:['Dip onto the rear leg.','Push up and turn the rear hip forward.','Fist goes up the middle, palm facing you.','Lead hand stays home.'],
+  mistakes:['Leaning back','Winding up the arm'],
+  cue:'Up the middle, through the guard.'},
+ {id:'body',cat:'Punches',name:'Body shots (↓)',what:'Any punch aimed at the body. In the app, ↓ after a number means to the body.',
+  steps:['Bend your knees to change level. Do not just reach down.','Keep your head off the centre line, slightly to the side.','Throw the punch at stomach or rib height.','Come straight back up into your guard.'],
+  mistakes:['Bending at the waist and dropping the head','Staying down too long'],
+  cue:'Knees, not back.'},
+
+ {id:'slip',cat:'Defense',name:'Slip',what:'Small move of the head off the line to make a straight punch miss.',
+  steps:['From your stance, rotate your shoulders and bend the knees slightly.','Move your head just outside your lead or rear shoulder.','Keep your eyes on the opponent and hands up.','Come back to centre, or counter straight away.'],
+  mistakes:['Slipping too big and losing balance','Looking down','Bending at the waist'],
+  cue:'Small and fast. Just enough to miss.'},
+ {id:'roll',cat:'Defense',name:'Roll (bob and weave)',what:'Duck under a hook by moving in a U shape.',
+  steps:['Bend your knees to drop under the punch.','Move your head in a U shape to the other side.','Stand back up on the outside, hands up.','Counter as you come up.'],
+  mistakes:['Ducking straight down with the head first','Hands drop as you roll'],
+  cue:'Legs go down, not the head.'},
+ {id:'parry',cat:'Defense',name:'Parry',what:'Tap an incoming straight punch aside with an open glove.',
+  steps:['Keep the guard tight.','Use a small hand movement to tap the punch off line.','Return the hand to the guard immediately.'],
+  mistakes:['Reaching out for the punch','Big swatting motions'],
+  cue:'Tap, don\'t swat.'},
+ {id:'block',cat:'Defense',name:'Block and cover',what:'Absorb shots on the gloves, arms and elbows when you cannot move.',
+  steps:['Tighten the guard, gloves to the temples.','Elbows in to protect the body.','Chin down, eyes still up.','Fire back as soon as the combo ends.'],
+  mistakes:['Closing your eyes','Staying covered too long'],
+  cue:'Cover, then answer.'},
+
+ {id:'step',cat:'Footwork',name:'Step and drag',what:'The basic way to move: the foot closest to where you go moves first.',
+  steps:['Going forward: lead foot steps, rear foot follows the same distance.','Going back: rear foot steps, lead foot follows.','Small steps, feet never cross or come together.','Stay in your stance the whole time.'],
+  mistakes:['Crossing the feet','Big jumpy steps','Standing up straight while moving'],
+  cue:'First foot to the direction moves first.'},
+ {id:'lateral',cat:'Footwork',name:'Side steps',what:'Moving left and right while staying in stance.',
+  steps:['To your left: lead foot steps left, rear foot follows.','To your right: rear foot steps right, lead foot follows.','Keep the distance between your feet the same.'],
+  mistakes:['Feet coming together','Bouncing too high'],
+  cue:'Glide, don\'t hop.'},
+ {id:'pivot',cat:'Footwork',name:'Pivot',what:'Turn on the lead foot to change angle and get out of the line of fire.',
+  steps:['Put your weight on the ball of the lead foot.','Swing the rear foot around in an arc (up to a quarter turn).','Finish facing the new angle, still in stance.','Often used after a combo: 1-2-3, then pivot out.'],
+  mistakes:['Pivoting on the heel','Turning so far you lose sight of the target'],
+  cue:'Hit, then don\'t be there.'},
+ {id:'angles',cat:'Footwork',name:'Angles',what:'Step off to the side after punching so you are not in front of the counter.',
+  steps:['Throw a combo.','Step off with a side step or pivot.','Reset your stance at the new angle.','Attack again from there.'],
+  mistakes:['Backing straight up every time','Moving without keeping the guard'],
+  cue:'Never leave the same way you came in.'},
+
+ {id:'shadow',cat:'Session drills',name:'Shadowboxing',what:'Boxing against an imaginary opponent. Practice technique, footwork and defense together.',
+  steps:['Picture an opponent in front of you at punching distance.','Move, throw combos, defend and move again.','Stay relaxed and focus on clean form, not power.','Follow the combo calls and the round theme.'],
+  mistakes:['Standing still and just punching','Forgetting defense','Throwing with no breathing'],
+  cue:'Every combo ends with defense or a step.'},
+ {id:'bag',cat:'Session drills',name:'Heavy bag',what:'Punching a bag to build power, timing and conditioning.',
+  steps:['Wrap your hands and wear gloves.','Stand at jab distance from the bag.','Throw combos, then move around the bag.','Let the bag swing and time your punches to it.','Follow the round theme and combo calls.'],
+  mistakes:['Pushing the bag instead of snapping punches','Standing too close and smothering','Dropping the guard between combos'],
+  cue:'Snap, don\'t push. Move after every combo.'},
+ {id:'rope',cat:'Session drills',name:'Jump rope',what:'The classic boxing warm-up. Builds rhythm, footwork and conditioning.',
+  steps:['Elbows close to your sides, turn the rope with your wrists.','Jump just high enough to clear the rope, on the balls of your feet.','Start with a basic bounce, then try boxer skip (light shuffle foot to foot).','Advanced: high knees, criss-cross, double-unders.'],
+  mistakes:['Jumping too high','Swinging the rope with the whole arm','Landing on the heels'],
+  cue:'Quiet feet. Small jumps.'},
+ {id:'skipmove',cat:'Session drills',name:'Skip and move (no rope)',what:'Warm-up when you have no rope.',
+  steps:['Skip on the spot like you hold a rope.','Mix in jumping jacks for 30 seconds.','Then high knees for 20 seconds.','Repeat, staying on the balls of your feet.'],
+  mistakes:['Going too hard too early'],
+  cue:'Warm up, don\'t burn out.'},
+ {id:'conditioning',cat:'Session drills',name:'Conditioning rounds',what:'High-effort rounds to build boxing fitness.',
+  steps:['Burpees, squat jumps and fast straight punches.','Work hard for 30 seconds, steady for 30 seconds, repeat.','Keep your guard up even when tired.'],
+  mistakes:['Sloppy form when tired','No breathing rhythm'],
+  cue:'Hard, then steady. Never stop moving.'},
+
+ {id:'pushup',cat:'Strength & core',name:'Pushups',what:'Builds punching endurance in chest, shoulders and arms.',
+  steps:['Hands just wider than shoulders, body in a straight line.','Lower your chest close to the floor, elbows about 45° from the body.','Push back up without letting the hips sag.','Too hard? Do them on your knees.'],
+  mistakes:['Hips sagging or piking up','Half reps'],
+  cue:'Straight line from head to heels.'},
+ {id:'situp',cat:'Strength & core',name:'Sit-ups and crunches',what:'Core strength to take body shots and turn the hips.',
+  steps:['Lie on your back, knees bent, feet flat.','Hands by your temples, not pulling the neck.','Curl up using your stomach, then lower slowly.'],
+  mistakes:['Pulling on the neck','Dropping down fast'],
+  cue:'Slow down is half the work.'},
+ {id:'plank',cat:'Strength & core',name:'Plank',what:'Holds the core tight. Stability for every punch.',
+  steps:['Forearms on the floor under the shoulders.','Body straight, squeeze stomach and glutes.','Breathe normally and hold.'],
+  mistakes:['Hips too high or too low','Holding the breath'],
+  cue:'Squeeze everything, keep breathing.'},
+ {id:'burpee',cat:'Strength & core',name:'Burpees',what:'Full-body conditioning move.',
+  steps:['From standing, squat and put your hands on the floor.','Jump the feet back into a plank.','Jump the feet back in.','Stand up and jump with arms up.'],
+  mistakes:['Back sagging in the plank','Landing hard on stiff legs'],
+  cue:'Smooth beats fast.'},
+ {id:'strength',cat:'Strength & core',name:'Strength & core finisher',what:'The finisher rounds in your session.',
+  steps:['Move through pushups, sit-ups, plank and burpees.','About 10–15 seconds or 5–10 reps of each, then the next.','Keep moving the whole round.'],
+  mistakes:['Rushing reps with bad form'],
+  cue:'Good reps only.'},
+
+ {id:'cooldown',cat:'Cool-down',name:'Cool-down and stretch',what:'Bring your heart rate down and loosen up after training.',
+  steps:['Walk slowly for 30 seconds, breathing deep.','Shoulders: pull each arm across the chest, 15 seconds each.','Chest: hands behind your back, open the chest, 15 seconds.','Calves: lean on a wall, back leg straight, 15 seconds each.','Neck: slow side-to-side tilts.'],
+  mistakes:['Skipping it'],
+  cue:'Slow breaths. You earned it.'}
+];
+const DRILL_BY_BLOCK={'Jump rope':'rope','Skip & move':'skipmove','Shadowboxing':'shadow','Bag':'bag','Footwork':'step','Conditioning':'conditioning','Strength & core':'strength','Core':'plank','Cool-down':'cooldown'};
+const drillById=id=>DRILLS.find(d=>d.id===id);
+let drillCat='All';
+function renderDrills(){
+  const box=$('drillBody');if(!box)return;box.innerHTML='';
+  const el=(t,c,txt)=>{const e=document.createElement(t);if(c)e.className=c;if(txt!=null)e.textContent=txt;return e};
+  box.appendChild(el('p','eq-note','Every drill in your sessions, step by step. Tap one to open it.'));
+  const ch=el('div','chips');['All',...DRILL_CATS].forEach(c=>{const b=el('button',null,c);b.type='button';b.setAttribute('aria-pressed',drillCat===c);
+    b.addEventListener('click',()=>{drillCat=c;renderDrills()});ch.appendChild(b)});box.appendChild(ch);
+  DRILL_CATS.filter(c=>drillCat==='All'||drillCat===c).forEach(c=>{
+    const sec=el('div','t-block');sec.appendChild(el('div','t-label',c));
+    const ul=el('ul','d-list');
+    DRILLS.filter(d=>d.cat===c).forEach(d=>{const li=el('li');li.tabIndex=0;li.setAttribute('role','button');
+      li.append(el('b',null,d.name),el('span',null,d.what));li.addEventListener('click',()=>openDrill(d.id));
+      li.addEventListener('keydown',e=>{if(e.key==='Enter')openDrill(d.id)});ul.appendChild(li)});
+    sec.appendChild(ul);box.appendChild(sec)});
+}
+function openDrill(id){
+  const d=drillById(id);if(!d)return;
+  const el=(t,c,txt)=>{const e=document.createElement(t);if(c)e.className=c;if(txt!=null)e.textContent=txt;return e};
+  let sh=$('drillSheet');if(sh)sh.remove();
+  sh=el('div','sheet');sh.id='drillSheet';sh.setAttribute('role','dialog');sh.setAttribute('aria-label',d.name);
+  const card=el('div','sheet-card');
+  card.append(el('div','t-label',d.cat),el('div','eq-q',d.name),el('p','t-why',d.what));
+  const vis=el('div','d-vis');vis.append(el('b',null,d.num?d.num:'▶'),el('span',null,'3D animation coming soon'));card.appendChild(vis);
+  card.appendChild(el('div','t-label','How to do it'));
+  const ol=el('ol','d-steps');d.steps.forEach(s=>ol.appendChild(el('li',null,s)));card.appendChild(ol);
+  card.appendChild(el('div','t-label','Common mistakes'));
+  const ul=el('ul','d-miss');d.mistakes.forEach(s=>ul.appendChild(el('li',null,s)));card.appendChild(ul);
+  const cue=el('div','t-block lvlbox');cue.append(el('div','t-label','Coach cue'),el('p','t-tip',d.cue));card.appendChild(cue);
+  if(d.note)card.appendChild(el('p','eq-note',d.note));
+  const x=el('button','ghost','Close');x.type='button';x.addEventListener('click',()=>sh.remove());card.appendChild(x);
+  sh.appendChild(card);sh.addEventListener('click',e=>{if(e.target===sh)sh.remove()});
+  document.body.appendChild(sh);
+}
+
 function refreshAll(){renderLog();renderPlan();if(!$('pProgress').hidden)renderProgress()}
 function openEdit(i){
   const L=store.get('rc-log')||[];const x=L[i];if(!x)return;
@@ -728,8 +917,8 @@ const TOUR=[
    b:['Bells start and end every round','Combos are called out loud and shown big','Clacks warn you before the bell (10 or 30 sec)','Every rest tells you what comes next']},
   {k:'After',h:'Four taps teach your coach',p:'Answer the check-in after each session.',
    b:['Three easy sessions in a row: level up','Sore or tired: an easier day','Wrong answer or extra session? Tap it in Progress to fix it']},
-  {k:'Timer & Progress',h:'Your tools',p:'Two more tabs at the top.',
-   b:['Timer: your own rounds, end-of-round warnings, combo calls and coach voice','Progress: week goal, streak, effort over time and every level-up']}
+  {k:'More tabs',h:'Your tools',p:'Three more tabs at the top.',
+   b:['Timer: your own rounds, end-of-round warnings, combo calls and coach voice','Drills: every move explained step by step. Tap any part of your session to open it','Progress: week goal, streak, effort over time and every level-up']}
 ];
 function openTour(){
   let ov=$('tour');if(ov)ov.remove();
