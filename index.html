@@ -218,7 +218,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
     <div class="row"><label for="voice">Say combos out loud<em>Also used in Today's plan</em></label>
       <div class="toggle"><input type="checkbox" id="voice" checked></div></div>
     <div class="row"><label for="voicePick">Coach voice<em id="voiceNow">Pick one that sounds right</em></label>
-      <div class="vsel"><select id="voicePick"><option value="">Built-in coach</option></select><button type="button" id="voiceTest">Test</button></div></div>
+      <div class="vsel"><select id="voicePick"><option value="">Coach 1 (male)</option><option value="clip:lessac">Coach 2 (female)</option></select><button type="button" id="voiceTest">Test</button></div></div>
   </div>
 
   <div class="total"><span>Total session</span><b id="total"></b></div>
@@ -226,7 +226,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 
   <section class="log"><h2>Recent sessions</h2><ul id="log"></ul></section>
   </div>
-  <p class="ver">Round Clock · updated 13 Oct 2026 · coach voice 3</p>
+  <p class="ver">Round Clock · updated 13 Oct 2026 · coach voices</p>
 </main>
 
 <!-- RUN -->
@@ -379,26 +379,29 @@ function say(t,force){try{if((!S.voice&&!force)||!('speechSynthesis' in window))
 function showVoice(v){const n=$('voiceNow');if(n)n.textContent=v?'Using: '+v.name.replace(/\s*\(.*\)/,'')+' ('+v.lang+')':'No English voice found on this phone';}
 function fillVoices(){
   const sel=$('voicePick');if(!sel)return;const V=enVoices();
-  sel.innerHTML='';const a=document.createElement('option');a.value='';a.textContent='Built-in coach';sel.appendChild(a);
+  sel.innerHTML='';[['','Coach 1 (male)'],['clip:lessac','Coach 2 (female)']].forEach(([v,t])=>{const a=document.createElement('option');a.value=v;a.textContent=t;sel.appendChild(a)});
   V.forEach(v=>{const o=document.createElement('option');o.value=v.name;o.textContent=v.name.replace(/\s*\(.*\)/,'')+' · '+v.lang.slice(-2);sel.appendChild(o)});
-  sel.value=V.some(v=>v.name===S.voiceName)?S.voiceName:'';
+  sel.value=(S.voiceName==='clip:lessac'||V.some(v=>v.name===S.voiceName))?S.voiceName:'';
 }
 try{fillVoices();speechSynthesis.addEventListener('voiceschanged',fillVoices);setTimeout(fillVoices,800);setTimeout(fillVoices,2500)}catch(e){}
 $('voicePick').addEventListener('change',e=>{S.voiceName=e.target.value;render();mediaMode();loadClips().then(()=>speakCombo(['one','two','three'],true))});
 $('voiceTest').addEventListener('click',()=>{mediaMode();loadClips().then(()=>speakCombo(['one','two','three','slip','two'],true))});
 /* recorded coach voice: same English voice on every phone */
-const CLIP={},CLIPW=['one','two','three','four','five','six','slip','roll','pivot'];let clipsP=null;
+const CLIPS={ryan:{},lessac:{}},CLIPW=['one','two','three','four','five','six','slip','roll','pivot'],clipsP={};
+const coachVoice=()=>S.voiceName==='clip:lessac'?'lessac':(!S.voiceName||S.voiceName==='clip:ryan')?'ryan':null;
 function loadClips(){
-  if(clipsP)return clipsP;const a=audio();if(!a||!window.fetch)return Promise.resolve();
-  clipsP=Promise.all(CLIPW.map(w=>fetch('audio/v2/'+w+'.mp3').then(r=>{if(!r.ok)throw 0;return r.arrayBuffer()})
-    .then(b=>new Promise((res,rej)=>a.decodeAudioData(b,res,rej))).then(buf=>{CLIP[w]=buf}).catch(()=>{})));
-  return clipsP;
+  const c=coachVoice();if(!c)return Promise.resolve();
+  if(clipsP[c])return clipsP[c];const a=audio();if(!a||!window.fetch)return Promise.resolve();
+  clipsP[c]=Promise.all(CLIPW.map(w=>fetch('audio/v3/'+c+'/'+w+'.mp3').then(r=>{if(!r.ok)throw 0;return r.arrayBuffer()})
+    .then(b=>new Promise((res,rej)=>a.decodeAudioData(b,res,rej))).then(buf=>{CLIPS[c][w]=buf}).catch(()=>{})));
+  return clipsP[c];
 }
 function playClips(words){
-  const a=audio();if(!a||S.voiceName||!words.every(w=>CLIP[w]))return false;
+  const c=coachVoice();const CLIP=c?CLIPS[c]:{};
+  const a=audio();if(!a||!c||!words.every(w=>CLIP[w]))return false;
   let t=a.currentTime+0.02;
   words.forEach(w=>{const s=a.createBufferSource(),g=a.createGain();g.gain.value=1;s.buffer=CLIP[w];s.connect(g).connect(a.destination);s.start(t);t+=CLIP[w].duration+0.28});
-  const n=$('voiceNow');if(n)n.textContent='Using: built-in coach voice';
+  const n=$('voiceNow');if(n)n.textContent='Using: '+(c==='ryan'?'Coach 1 (male)':'Coach 2 (female)');
   return true;
 }
 function speakCombo(words,force){
