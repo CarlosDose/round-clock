@@ -158,6 +158,14 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 .saved{color:var(--green);font-weight:600}
 .log li .tag{color:var(--amber);font-weight:600;margin-left:6px}
 .ver{margin:8px 0 0;text-align:center;font-size:.75rem;color:var(--muted);letter-spacing:.04em}
+.lvlbox{border-color:var(--amber);background:color-mix(in srgb,var(--amber) 10%,var(--panel))}
+.lvlbox .t-label{color:var(--amber)}
+.lvl-text{font-family:var(--display);font-weight:900;font-size:1.9rem;line-height:1;text-transform:uppercase;letter-spacing:.02em}
+.lvl{display:flex;flex-direction:column;gap:8px;align-items:center;padding:22px 16px;border:2px solid var(--amber);border-radius:12px;background:color-mix(in srgb,var(--amber) 12%,var(--ground));animation:lvlpop .5s ease-out}
+.lvl-tag{font-family:var(--display);font-weight:900;font-size:3rem;line-height:1;color:var(--amber);letter-spacing:.04em;text-transform:uppercase}
+.lvl p{margin:0;color:var(--muted)}
+@keyframes lvlpop{0%{transform:scale(.85);opacity:0}70%{transform:scale(1.04);opacity:1}100%{transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.lvl{animation:none}}
 .prog{display:flex;flex-direction:column;gap:18px}
 .p-hero{display:flex;flex-direction:column;gap:6px}
 .p-big{font-family:var(--display);font-weight:900;font-size:clamp(3rem,14vw,4.2rem);line-height:.9;font-variant-numeric:tabular-nums}
@@ -180,6 +188,8 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 .p-ups{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
 .p-ups li{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:.95rem;font-variant-numeric:tabular-nums}
 .p-ups li span:first-child{color:var(--muted)}
+.p-up{display:flex;flex-direction:column;align-items:flex-end;text-align:right;gap:2px}
+.p-up small{color:var(--muted);font-size:.82rem}
 .ghost{background:none;border:1px solid var(--line);border-radius:8px;padding:14px;font-weight:600}
 </style>
 </head>
@@ -252,7 +262,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
   <div class="panel" id="pProgress" role="tabpanel" aria-labelledby="tabProgress" hidden>
     <div id="progBody" class="prog"></div>
   </div>
-  <p class="ver">Round Clock · updated 13 Oct 2026 · progress</p>
+  <p class="ver">Round Clock · updated 13 Oct 2026 · level-ups</p>
 </main>
 
 <!-- RUN -->
@@ -295,6 +305,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
     <button type="button" class="link" id="skipCheck">Skip for today</button>
   </form>
   <p class="saved" id="saved" hidden>Check-in saved.</p>
+  <div class="lvl" id="lvl" hidden><div class="lvl-tag">Level up</div><div class="lvl-text" id="lvlText"></div><p id="lvlDetail"></p><p>Your next session is a step harder. You earned it.</p></div>
   <button class="go" id="again">Go again</button>
   <button class="ghost" id="back">Change settings</button>
 </section>
@@ -483,7 +494,7 @@ function makePlan(){
   const avg=rpe.reduce((a,b)=>a+b,0)/rpe.length;
   const sore=(c.sore||[]).filter(s=>s!=='None');
   const days=last.ts?Math.floor((Date.now()-last.ts)/864e5):0;
-  let kind,why;
+  let kind,why,up=null;const before=Object.assign({},p);
   if(sore.length){
     kind='ease';p.rounds=clamp('rounds',p.rounds-1);p.rest=clamp('rest',p.rest+30);
     why=`You felt ${sore.join(' and ').toLowerCase()} last time. One main round less, more rest and a shorter finisher. If it still hurts, take the day off.`;
@@ -498,8 +509,10 @@ function makePlan(){
     why=`${days} days since your last session. Ease back in with one main round less.`;
   }else if(rpe.length>=3&&avg<=5){
     kind='up';
-    if(p.rest>45){p.rest=clamp('rest',p.rest-15);why='Your last 3 sessions felt easy. Level up: 15 seconds less rest between main rounds.'}
-    else{p.rounds=clamp('rounds',p.rounds+1);why='Your last 3 sessions felt easy. Level up: one extra main round.'}
+    if(p.rest>45){p.rest=clamp('rest',p.rest-15);why='Your last 3 sessions felt easy, so the coach made the main rounds harder.';
+      up={text:`${before.rest-p.rest} seconds less rest`,detail:`Rest between main rounds: ${fmt(before.rest)} → ${fmt(p.rest)}`}}
+    else{p.rounds=clamp('rounds',p.rounds+1);why='Your last 3 sessions felt easy, so the coach made the main rounds harder.';
+      up={text:'One extra main round',detail:`Main rounds: ${before.rounds} → ${p.rounds}`}}
   }else{
     kind='hold';
     why=rpe[0]<=5?'That felt easy. Do it again. If it feels easy three times in a row, we level up.':'Good level for you right now. Same session, aim to make it sharper.';
@@ -508,7 +521,7 @@ function makePlan(){
   const opts=sore.includes('Hands/wrists')?['Shadowboxing','Footwork']:Object.keys(TIPS_ADV).filter(f=>!(noBag&&f==='Bag'));
   const seen={};all.slice(0,6).forEach((x,i)=>((x.c&&x.c.focus)||[]).concat(x.f?[x.f]:[]).forEach(f=>{if(!(f in seen))seen[f]=i}));
   const focus=opts.slice().sort((a,b)=>(b in seen?seen[b]:99)-(a in seen?seen[a]:99))[0];
-  return done({main:p,kind,why,focus});
+  return done({main:p,kind,why,focus,up});
 }
 function renderPlan(){
   P=makePlan();const b=$('tBody'),badge=$('tBadge');b.innerHTML='';
@@ -547,7 +560,9 @@ function renderPlan(){
   const who=el('div','t-who');
   who.appendChild(el('span',null,pr.level?'Plan for '+LEVELS[pr.level].l:'No profile yet'));
   const ed=el('button','link',pr.level?'Edit about me':'Tell your coach about you');ed.type='button';ed.addEventListener('click',openOnb);who.appendChild(ed);
-  b.append(q,m,list,f,w,a,who);
+  const parts=[q,m];
+  if(P.up){const lv=el('div','t-block lvlbox');lv.append(el('div','t-label','Level up'),el('div','lvl-text',P.up.text),el('p','t-tip',P.up.detail));parts.push(lv)}
+  b.append(...parts,list,f,w,a,who);
 }
 function openOnb(){
   const pr=profile()||{};Object.keys(O).forEach(k=>delete O[k]);
@@ -622,7 +637,9 @@ function renderProgress(){
   const ups=el('div','t-block');ups.appendChild(el('div','t-label','Level-ups'));
   const U=L.filter(x=>x.k==='up'&&x.m);
   if(U.length){const ul=el('ul','p-ups');U.slice(0,8).forEach(x=>{const li=el('li');
-      li.append(el('span',null,x.d),el('span',null,`${x.m.rounds} × ${fmt(x.m.round)} · rest ${x.m.rest?fmt(x.m.rest):'none'}`));ul.appendChild(li)});ups.appendChild(ul)}
+      const r=el('span','p-up');r.appendChild(el('b',null,x.u?x.u.text:'Harder main rounds'));
+      r.appendChild(el('small',null,x.u?x.u.detail:`${x.m.rounds} × ${fmt(x.m.round)} · rest ${x.m.rest?fmt(x.m.rest):'none'}`));
+      li.append(el('span',null,x.d),r);ul.appendChild(li)});ups.appendChild(ul)}
   else ups.appendChild(el('p','p-sub','No level-ups yet. When a session feels easy three times in a row, the coach makes the main rounds harder and it shows up here.'));
   box.append(hero,strip,stats,ch,ups);
 }
@@ -633,7 +650,7 @@ function saveLog(){
   const d=new Date();const ds=d.toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'})+' '+d.toTimeString().slice(0,5);
   const main=R.blocks.find(x=>x.main)||R.blocks[0];
   L.unshift({d:ds,ts:Date.now(),kind:R.mode,r:R.done,w:Math.round(R.work),t:main.round,p:main.rest,
-    m:{rounds:main.rounds,round:main.round,rest:main.rest},f:R.mode==='plan'?main.name:undefined,k:R.mode==='plan'&&P?P.kind:undefined});
+    m:{rounds:main.rounds,round:main.round,rest:main.rest},f:R.mode==='plan'?main.name:undefined,k:R.mode==='plan'&&P?P.kind:undefined,u:R.mode==='plan'&&P&&P.up?P.up:undefined});
   store.set('rc-log',L.slice(0,50));
 }
 
@@ -764,12 +781,13 @@ document.querySelectorAll('.chips').forEach(g=>{const q=g.dataset.q,multi=g.hasA
 function resetCheck(show){
   Object.keys(C).forEach(k=>delete C[k]);$('note').value='';
   document.querySelectorAll('#check [aria-pressed]').forEach(x=>x.setAttribute('aria-pressed','false'));
-  $('check').hidden=!show;$('saved').hidden=true;
+  $('check').hidden=!show;$('saved').hidden=true;$('lvl').hidden=true;
 }
 $('check').addEventListener('submit',e=>{e.preventDefault();
   const L=store.get('rc-log')||[];
   if(L[0]){L[0].c=Object.assign({},C,{note:$('note').value.trim()});store.set('rc-log',L)}
   $('check').hidden=true;$('saved').hidden=false;renderLog();renderPlan();
+  if(P&&P.up){$('lvlText').textContent=P.up.text;$('lvlDetail').textContent=P.up.detail;$('lvl').hidden=false;bell(2)}
 });
 $('back').addEventListener('click',()=>{renderPlan();tab(P?'today':'timer')});
 $('skipCheck').addEventListener('click',()=>{$('check').hidden=true});
