@@ -218,7 +218,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
     <div class="row"><label for="voice">Say combos out loud<em>Also used in Today's plan</em></label>
       <div class="toggle"><input type="checkbox" id="voice" checked></div></div>
     <div class="row"><label for="voicePick">Coach voice<em id="voiceNow">Pick one that sounds right</em></label>
-      <div class="vsel"><select id="voicePick"><option value="">Automatic</option></select><button type="button" id="voiceTest">Test</button></div></div>
+      <div class="vsel"><select id="voicePick"><option value="">Built-in coach</option></select><button type="button" id="voiceTest">Test</button></div></div>
   </div>
 
   <div class="total"><span>Total session</span><b id="total"></b></div>
@@ -226,7 +226,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 
   <section class="log"><h2>Recent sessions</h2><ul id="log"></ul></section>
   </div>
-  <p class="ver">Round Clock · updated 13 Oct 2026 · voice fix 2</p>
+  <p class="ver">Round Clock · updated 13 Oct 2026 · coach voice</p>
 </main>
 
 <!-- RUN -->
@@ -379,19 +379,38 @@ function say(t,force){try{if((!S.voice&&!force)||!('speechSynthesis' in window))
 function showVoice(v){const n=$('voiceNow');if(n)n.textContent=v?'Using: '+v.name.replace(/\s*\(.*\)/,'')+' ('+v.lang+')':'No English voice found on this phone';}
 function fillVoices(){
   const sel=$('voicePick');if(!sel)return;const V=enVoices();
-  sel.innerHTML='';const a=document.createElement('option');a.value='';a.textContent='Automatic';sel.appendChild(a);
+  sel.innerHTML='';const a=document.createElement('option');a.value='';a.textContent='Built-in coach';sel.appendChild(a);
   V.forEach(v=>{const o=document.createElement('option');o.value=v.name;o.textContent=v.name.replace(/\s*\(.*\)/,'')+' · '+v.lang.slice(-2);sel.appendChild(o)});
   sel.value=V.some(v=>v.name===S.voiceName)?S.voiceName:'';
 }
 try{fillVoices();speechSynthesis.addEventListener('voiceschanged',fillVoices);setTimeout(fillVoices,800);setTimeout(fillVoices,2500)}catch(e){}
-$('voicePick').addEventListener('change',e=>{S.voiceName=e.target.value;render();say('one, two, three',true)});
-$('voiceTest').addEventListener('click',()=>{say('one, two, three. Jab, cross, hook.',true)});
+$('voicePick').addEventListener('change',e=>{S.voiceName=e.target.value;render();mediaMode();loadClips().then(()=>speakCombo(['one','two','three'],true))});
+$('voiceTest').addEventListener('click',()=>{mediaMode();loadClips().then(()=>speakCombo(['one','two','three','slip','two'],true))});
+/* recorded coach voice: same English voice on every phone */
+const CLIP={},CLIPW=['one','two','three','four','five','six','slip','roll','pivot'];let clipsP=null;
+function loadClips(){
+  if(clipsP)return clipsP;const a=audio();if(!a||!window.fetch)return Promise.resolve();
+  clipsP=Promise.all(CLIPW.map(w=>fetch('audio/'+w+'.mp3').then(r=>{if(!r.ok)throw 0;return r.arrayBuffer()})
+    .then(b=>new Promise((res,rej)=>a.decodeAudioData(b,res,rej))).then(buf=>{CLIP[w]=buf}).catch(()=>{})));
+  return clipsP;
+}
+function playClips(words){
+  const a=audio();if(!a||S.voiceName||!words.every(w=>CLIP[w]))return false;
+  let t=a.currentTime+0.02;
+  words.forEach(w=>{const s=a.createBufferSource(),g=a.createGain();g.gain.value=1.5;s.buffer=CLIP[w];s.connect(g).connect(a.destination);s.start(t);t+=CLIP[w].duration+0.06});
+  const n=$('voiceNow');if(n)n.textContent='Using: built-in coach voice';
+  return true;
+}
+function speakCombo(words,force){
+  if(!S.voice&&!force)return false;
+  return playClips(words)||say(words.join(', '),force);
+}
 function callCombo(){
   const c=pickCombo(),parts=c.split('-');
   $('comboN').textContent=c;
   $('comboW').textContent=parts.map(p=>PUNCH[p]?PUNCH[p][1]:p).join(' · ');
   const box=$('combo');box.classList.remove('flash');void box.offsetWidth;box.classList.add('flash');
-  if(!say(parts.map(p=>PUNCH[p]?PUNCH[p][0]:p).join(', ')))beep(true);
+  if(!speakCombo(parts.map(p=>PUNCH[p]?PUNCH[p][0]:p)))beep(true);
 }
 function clearCombo(){$('comboN').textContent='';$('comboW').textContent=''}
 function tipFor(f){return (isBasic()?TIPS_BASIC:TIPS_ADV)[f]}
@@ -588,7 +607,7 @@ function start(mode){
   if(mode==='plan'&&!P)mode='timer';
   R.mode=mode;
   R.blocks=mode==='plan'?P.blocks:[{name:null,rounds:S.rounds,round:S.round,rest:S.rest,gap:0,tip:'',main:true,combos:S.combos}];
-  mediaMode();audio();
+  mediaMode();audio();loadClips();
   if(S.voice)try{const u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u)}catch(e){}
   R.list=build(R.blocks);R.total=blocksRounds(R.blocks);R.i=-1;R.done=0;R.work=0;R.on=true;R.paused=false;
   $('pause').textContent='Pause';$('confirm').hidden=true;$('ctrls').hidden=false;
