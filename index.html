@@ -325,7 +325,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
     <div id="progBody" class="prog"></div>
   </div>
   <button type="button" class="link" id="tourLink">How Round Clock works</button>
-  <p class="ver">Round Clock · updated 13 Oct 2026 · gloves + backup</p>
+  <p class="ver">Round Clock · updated 13 Oct 2026 · faster coach</p>
 </main>
 
 <!-- RUN -->
@@ -356,7 +356,8 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
     <h3>Coach check-in</h3>
     <fieldset><legend>How hard was it?</legend>
       <div class="scale" id="rpe"></div>
-      <div class="ends"><span>Easy</span><span>All-out</span></div></fieldset>
+      <div class="ends"><span>Easy</span><span>All-out</span></div>
+      <p class="eq-note">Aim for 6–8: hard but good. Rate honestly. 5 or lower makes your next session harder.</p></fieldset>
     <fieldset><legend>Energy today</legend>
       <div class="chips" data-q="energy"><button type="button" data-v="Low">Low</button><button type="button" data-v="OK">OK</button><button type="button" data-v="High">High</button></div></fieldset>
     <fieldset><legend>Anything sore or hurting?</legend>
@@ -606,7 +607,7 @@ function makePlan(){
     const [r,t,p]=LEVELS[pr.level].p;
     let focus=GOAL_FOCUS[pr.goal]||'Shadowboxing';if(focus==='Bag'&&noBag)focus='Shadowboxing';
     return done({main:{rounds:r,round:t,rest:p},kind:'start',focus,
-      why:`A starting point for ${LEVELS[pr.level].l}, short enough to keep your form clean. After each session, the check-in tells your coach how it felt and the plan adjusts.`});
+      why:`A starting point for ${LEVELS[pr.level].l}. Rate it honestly after the session: if it felt easy, the next one gets harder right away, until it feels like solid work.`});
   }
   const last=L[0],c=last.c;
   const p=Object.assign({},last.m||{rounds:last.r,round:last.t,rest:last.p});
@@ -627,15 +628,27 @@ function makePlan(){
   }else if(days>=(GAP[pr.days]||5)){
     kind='ease';p.rounds=clamp('rounds',p.rounds-1);
     why=`${days} days since your last session. Ease back in with one main round less.`;
-  }else if(rpe.length>=3&&avg<=5){
-    kind='up';
-    if(p.rest>45){p.rest=clamp('rest',p.rest-15);why='Your last 3 sessions felt easy, so the coach made the main rounds harder.';
-      up={text:`${before.rest-p.rest} seconds less rest`,detail:`Rest between main rounds: ${fmt(before.rest)} → ${fmt(p.rest)}`}}
-    else{p.rounds=clamp('rounds',p.rounds+1);why='Your last 3 sessions felt easy, so the coach made the main rounds harder.';
-      up={text:'One extra main round',detail:`Main rounds: ${before.rounds} → ${p.rounds}`}}
+  }else if(rpe[0]<=5){
+    // react after every check-in: easy = harder right away, very easy = two steps
+    const steps=rpe[0]<=3?2:1,changes=[];
+    for(let i=0;i<steps;i++){
+      if(p.round<180){const b=p.round;p.round=Math.min(180,p.round+30);changes.push({t:'Longer rounds',d:`Round time: ${fmt(b)} → ${fmt(p.round)}`})}
+      else if(p.rest>45){const b=p.rest;p.rest=clamp('rest',p.rest-15);changes.push({t:`${b-p.rest} seconds less rest`,d:`Rest between main rounds: ${fmt(b)} → ${fmt(p.rest)}`})}
+      else if(p.rounds<12){const b=p.rounds;p.rounds=p.rounds+1;changes.push({t:'One extra main round',d:`Main rounds: ${b} → ${p.rounds}`})}
+    }
+    if(changes.length){
+      kind='up';
+      const d=[];if(p.round!==before.round)d.push(`Round time: ${fmt(before.round)} → ${fmt(p.round)}`);
+      if(p.rest!==before.rest)d.push(`Rest between main rounds: ${fmt(before.rest)} → ${fmt(p.rest)}`);
+      if(p.rounds!==before.rounds)d.push(`Main rounds: ${before.rounds} → ${p.rounds}`);
+      up={text:changes.length>1?'Two steps harder':changes[0].t,detail:d.join(' · ')};
+      why=steps>1?'That felt way too easy, so the coach made the next session two steps harder right away. It keeps adjusting after every session until it feels like solid work: 6–8 out of 10.'
+        :'That felt easy, so the coach made the main rounds harder right away. The goal is sessions that feel like solid work: 6–8 out of 10.';
+    }else{kind='hold';why='You are at the top of this plan: 12 main rounds with short rest. Push the pace and power inside the rounds.'}
   }else{
     kind='hold';
-    why=rpe[0]<=5?'That felt easy. Do it again. If it feels easy three times in a row, we level up.':'Good level for you right now. Same session, aim to make it sharper.';
+    why=rpe[0]>=9?'That was close to all-out. Same session again. If the next one is just as hard, the coach gives you more rest.'
+      :'Good level for you right now: solid work. Same session, aim to make it sharper.';
   }
   // focus: avoid hands if they're sore, otherwise pick what you've done least recently
   const opts=sore.includes('Hands/wrists')?['Shadowboxing','Footwork']:Object.keys(TIPS_ADV).filter(f=>!(noBag&&f==='Bag'));
@@ -966,7 +979,7 @@ const TOUR=[
   {k:'During',h:'Keep your gloves on',p:'Everything runs by itself from start to finish.',
    b:['Bells start and end every round','Combos are called out loud and shown big','Tap anywhere to pause. Hold Skip or Stop for a second','Clacks warn you before the bell (10 or 30 sec)']},
   {k:'After',h:'Four taps teach your coach',p:'Answer the check-in after each session.',
-   b:['Three easy sessions in a row: level up','Sore or tired: an easier day','Wrong answer or extra session? Tap it in Progress to fix it','Save a backup now and then (bottom of Progress)']},
+   b:['Felt easy (5 or lower)? The next session gets harder right away','Sore or tired: an easier day','Wrong answer or extra session? Tap it in Progress to fix it','Save a backup now and then (bottom of Progress)']},
   {k:'More tabs',h:'Your tools',p:'Three more tabs at the top.',
    b:['Timer: your own rounds, end-of-round warnings, combo calls and coach voice','Drills: every move explained step by step. Tap any part of your session to open it','Progress: week goal, streak, effort over time and every level-up']}
 ];
@@ -1036,7 +1049,7 @@ function renderProgress(){
       svg+=`<rect x="${pad+i*bw+3}" y="${H-h}" width="${bw-6}" height="${h}" rx="3" fill="${c}"/><text x="${pad+i*bw+bw/2}" y="${H-h-4}" font-size="10" text-anchor="middle" fill="var(--text)">${x.c.rpe}</text>`});
     svg+=`<text x="${pad}" y="${H+14}" font-size="10" fill="var(--muted)">older</text><text x="${W}" y="${H+14}" font-size="10" text-anchor="end" fill="var(--muted)">latest</text></svg>`;
     const wrap=el('div');wrap.innerHTML=svg;ch.appendChild(wrap);
-    ch.appendChild(el('p','p-sub','Green is easy, amber is solid work, red is close to all-out. Three green in a row and the coach levels you up.'));
+    ch.appendChild(el('p','p-sub','Green is easy, amber is solid work, red is close to all-out. Aim for amber: 6–8. Green means the next session gets harder.'));
   }else ch.appendChild(el('p','p-sub','Answer the check-in after a session to see this.'));
   // level-ups
   const ups=el('div','t-block');ups.appendChild(el('div','t-label','Level-ups'));
