@@ -228,6 +228,19 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 .bk-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .bk-row .ghost{padding:12px 8px}
 .bk-file{font:inherit;color:var(--muted);max-width:100%}
+.mp{display:grid;grid-template-columns:auto 1fr repeat(4,44px);align-items:center;gap:6px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:6px;margin-bottom:12px;min-width:0}
+.mp img{width:44px;height:44px;border-radius:6px;object-fit:cover;max-width:100%}
+.mp-txt{display:flex;flex-direction:column;min-width:0;line-height:1.25}
+.mp-txt b,.mp-txt span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mp-txt b{font-size:.95rem}.mp-txt span{font-size:.8rem;color:var(--muted)}
+.mp button{width:44px;height:44px;border-radius:50%;border:0;background:rgba(255,255,255,.08);font-size:1rem}
+.mp #mpPlay{background:#1ed760;color:#000}
+.sp-btn{background:none;border:1px solid #1ed760;color:#1ed760;border-radius:999px;padding:9px 16px;font-weight:700}
+.toast{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--text);color:var(--ground);border-radius:10px;padding:12px 14px;font-weight:600;text-align:center}
+.pl-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;max-height:55vh;overflow-y:auto}
+.pl-list li{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer;min-width:0}
+.pl-list li span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.pl-list img,.pl-noimg{width:44px;height:44px;border-radius:6px;object-fit:cover;flex:none;display:grid;place-items:center;background:var(--line)}
 .prog{display:flex;flex-direction:column;gap:18px}
 .p-hero{display:flex;flex-direction:column;gap:6px}
 .p-big{font-family:var(--display);font-weight:900;font-size:clamp(3rem,14vw,4.2rem);line-height:.9;font-variant-numeric:tabular-nums}
@@ -313,6 +326,8 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
       <div class="toggle"><input type="checkbox" id="combos" checked></div></div>
     <div class="row"><label for="voice">Say combos out loud<em>Also used in Today's plan</em></label>
       <div class="toggle"><input type="checkbox" id="voice" checked></div></div>
+    <div class="row" id="spRow" hidden><label for="spBtn">Spotify<em id="spState"></em></label>
+      <button type="button" class="sp-btn" id="spBtn">Connect</button></div>
     <div class="row"><label for="music">Playing music<em>Keeps Spotify playing. Bells mix on top. Silent switch off</em></label>
       <div class="toggle"><input type="checkbox" id="music"></div></div>
     <div class="row"><label for="voicePick">Coach voice<em id="voiceNow">Pick one that sounds right</em></label>
@@ -331,7 +346,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
     <div id="progBody" class="prog"></div>
   </div>
   <button type="button" class="link" id="tourLink">How Round Clock works</button>
-  <p class="ver">Round Clock · updated 13 Oct 2026 · music</p>
+  <p class="ver">Round Clock · updated 13 Oct 2026 · spotify</p>
 </main>
 
 <!-- RUN -->
@@ -341,6 +356,14 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
   <div class="clock" id="clock" aria-live="off">0:10</div>
   <div class="combo" id="combo" aria-live="polite"><b id="comboN"></b><span id="comboW"></span></div>
   <div class="next" id="next"></div>
+  <div class="mp" id="mp" hidden>
+    <img id="mpArt" alt="" hidden>
+    <div class="mp-txt"><b id="mpTitle"></b><span id="mpArtist"></span></div>
+    <button type="button" id="mpPrev" aria-label="Previous song">⏮</button>
+    <button type="button" id="mpPlay" aria-label="Play music">▶</button>
+    <button type="button" id="mpNext" aria-label="Next song">⏭</button>
+    <button type="button" id="mpList" aria-label="Pick a playlist">☰</button>
+  </div>
   <div class="bar"><div id="bar"></div></div>
   <div class="ctrls" id="ctrls">
     <button id="stop" class="hold"><span>Stop</span><small>hold</small><i></i></button>
@@ -984,6 +1007,115 @@ function openFeedback(){
   const x=el('button','link','Close');x.type='button';x.addEventListener('click',()=>sh.remove());card.appendChild(x);
   sh.appendChild(card);sh.addEventListener('click',e=>{if(e.target===sh)sh.remove()});document.body.appendChild(sh);setTimeout(()=>ta.focus(),60);
 }
+/* ---------- Spotify player (Web API + PKCE, needs Spotify Premium) ---------- */
+const SPOTIFY_CLIENT_ID='';            // from the Spotify developer dashboard (not secret)
+const SP_ID=SPOTIFY_CLIENT_ID||store.get('sp-client')||'';
+const SP_SCOPES='user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private playlist-read-collaborative';
+const SP_REDIRECT=location.origin+location.pathname.replace(/index\.html$/,'');
+const SP={tok:store.get('sp-tok'),now:null,timer:null,busy:false};
+const spOn=()=>!!(SP_ID&&SP.tok&&SP.tok.refresh);
+const b64url=buf=>btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+async function spConnect(){
+  if(!SP_ID)return;
+  const rnd=new Uint8Array(48);crypto.getRandomValues(rnd);const verifier=b64url(rnd);
+  const challenge=b64url(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier)));
+  const st=b64url(crypto.getRandomValues(new Uint8Array(12)));
+  store.set('sp-verifier',verifier);store.set('sp-state',st);
+  location.href='https://accounts.spotify.com/authorize?'+new URLSearchParams({response_type:'code',client_id:SP_ID,scope:SP_SCOPES,
+    code_challenge_method:'S256',code_challenge:challenge,redirect_uri:SP_REDIRECT,state:st});
+}
+async function spTokenRequest(body){
+  const r=await fetch('https://accounts.spotify.com/api/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:new URLSearchParams(Object.assign({client_id:SP_ID},body))});
+  if(!r.ok)throw new Error('token '+r.status);
+  const j=await r.json();
+  SP.tok={access:j.access_token,refresh:j.refresh_token||(SP.tok&&SP.tok.refresh),exp:Date.now()+(j.expires_in-60)*1000};
+  store.set('sp-tok',SP.tok);return SP.tok;
+}
+async function spHandleRedirect(){
+  const q=new URLSearchParams(location.search);if(!q.has('code')&&!q.has('error'))return;
+  history.replaceState(null,'',SP_REDIRECT+location.hash);
+  if(q.get('error')||q.get('state')!==store.get('sp-state')){spToast('Spotify was not connected.');return}
+  try{await spTokenRequest({grant_type:'authorization_code',code:q.get('code'),redirect_uri:SP_REDIRECT,code_verifier:store.get('sp-verifier')});
+    S.music=true;render();spToast('Spotify connected. Your music keeps playing under the bells.');renderSpRow()}
+  catch(e){spToast('Could not connect Spotify. Try again.')}
+}
+function spDisconnect(){SP.tok=null;store.set('sp-tok',null);SP.now=null;renderSpRow();renderMp()}
+async function spApi(path,opt={},retry=true){
+  if(!spOn())throw new Error('off');
+  if(Date.now()>SP.tok.exp)await spTokenRequest({grant_type:'refresh_token',refresh_token:SP.tok.refresh});
+  const r=await fetch('https://api.spotify.com/v1'+path,Object.assign({},opt,{headers:Object.assign({Authorization:'Bearer '+SP.tok.access},opt.body?{'Content-Type':'application/json'}:{})}));
+  if(r.status===401&&retry){try{await spTokenRequest({grant_type:'refresh_token',refresh_token:SP.tok.refresh})}catch(e){spDisconnect();throw e}return spApi(path,opt,false)}
+  if(r.status===204||r.status===202)return null;
+  const j=await r.json().catch(()=>null);
+  if(!r.ok){const err=new Error((j&&j.error&&j.error.reason)||('http '+r.status));err.status=r.status;throw err}
+  return j;
+}
+function spMsg(e){
+  if(e&&(e.message==='NO_ACTIVE_DEVICE'||e.status===404))return 'Open the Spotify app and play any song once, then try again.';
+  if(e&&(e.message==='PREMIUM_REQUIRED'||e.status===403))return 'Spotify only allows this with Premium.';
+  if(e&&e.status===429)return 'Spotify is busy. Try again in a moment.';
+  return 'Spotify did not respond. Try again.';
+}
+async function spRefreshNow(){
+  if(!spOn()||document.hidden)return;
+  try{const j=await spApi('/me/player?additional_types=episode');SP.now=j&&j.item?{
+      title:j.item.name,artist:(j.item.artists||[]).map(a=>a.name).join(', ')||(j.item.show&&j.item.show.name)||'',
+      art:((j.item.album&&j.item.album.images)||(j.item.images)||[]).slice(-1)[0],playing:!!j.is_playing}:null}
+  catch(e){SP.now=null}
+  renderMp();
+}
+async function spCmd(kind){
+  if(SP.busy)return;SP.busy=true;
+  try{
+    if(kind==='toggle')await spApi(SP.now&&SP.now.playing?'/me/player/pause':'/me/player/play',{method:'PUT'});
+    if(kind==='next')await spApi('/me/player/next',{method:'POST'});
+    if(kind==='prev')await spApi('/me/player/previous',{method:'POST'});
+    setTimeout(spRefreshNow,400);
+  }catch(e){spToast(spMsg(e))}finally{SP.busy=false}
+}
+async function spPlayContext(uri){
+  try{await spApi('/me/player/play',{method:'PUT',body:JSON.stringify({context_uri:uri})})}
+  catch(e){
+    if(e.status===404){ // no active device: wake the phone's Spotify if it is listed
+      try{const d=await spApi('/me/player/devices');const dev=(d.devices||[]).find(x=>x.type==='Smartphone')||(d.devices||[])[0];
+        if(dev){await spApi('/me/player/play?device_id='+encodeURIComponent(dev.id),{method:'PUT',body:JSON.stringify({context_uri:uri})})}else throw e}
+      catch(e2){spToast(spMsg(e2));return}
+    }else{spToast(spMsg(e));return}
+  }
+  setTimeout(spRefreshNow,600);
+}
+async function openPlaylists(){
+  const el=(t,c,txt)=>{const e=document.createElement(t);if(c)e.className=c;if(txt!=null)e.textContent=txt;return e};
+  let sh=$('plSheet');if(sh)sh.remove();sh=el('div','sheet');sh.id='plSheet';sh.setAttribute('role','dialog');sh.setAttribute('aria-label','Your playlists');
+  const card=el('div','sheet-card');card.append(el('div','eq-q','Your playlists'));const ul=el('ul','pl-list');card.appendChild(ul);
+  const x=el('button','link','Close');x.type='button';x.addEventListener('click',()=>sh.remove());card.appendChild(x);
+  sh.appendChild(card);sh.addEventListener('click',e=>{if(e.target===sh)sh.remove()});document.body.appendChild(sh);
+  ul.appendChild(el('li','eq-note','Loading…'));
+  try{const j=await spApi('/me/playlists?limit=30');ul.innerHTML='';
+    (j.items||[]).filter(Boolean).forEach(p=>{const li=el('li');li.tabIndex=0;li.setAttribute('role','button');
+      const im=(p.images||[]).slice(-1)[0];if(im){const i=el('img');i.src=im.url;i.alt='';li.appendChild(i)}else li.appendChild(el('span','pl-noimg','♪'));
+      li.appendChild(el('span',null,p.name));li.addEventListener('click',()=>{sh.remove();spPlayContext(p.uri)});ul.appendChild(li)});
+    if(!ul.children.length)ul.appendChild(el('li','eq-note','No playlists found in your Spotify.'));
+  }catch(e){ul.innerHTML='';ul.appendChild(el('li','eq-note',spMsg(e)))}
+}
+function renderMp(){
+  const mp=$('mp');if(!mp)return;mp.hidden=!spOn();if(!spOn())return;
+  const n=SP.now;$('mpTitle').textContent=n?n.title:'Nothing playing';$('mpArtist').textContent=n?n.artist:'Pick a playlist or press play';
+  const img=$('mpArt');if(n&&n.art){img.src=n.art.url;img.hidden=false}else img.hidden=true;
+  $('mpPlay').textContent=n&&n.playing?'❚❚':'▶';$('mpPlay').setAttribute('aria-label',n&&n.playing?'Pause music':'Play music');
+}
+function spStartPolling(){spStopPolling();if(!spOn())return;spRefreshNow();SP.timer=setInterval(spRefreshNow,5000)}
+function spStopPolling(){clearInterval(SP.timer);SP.timer=null}
+function renderSpRow(){
+  const row=$('spRow');if(!row)return;row.hidden=!SP_ID;if(!SP_ID)return;
+  $('spState').textContent=spOn()?'Connected. Controls show during your session':'See the song and skip, without leaving the app (Premium)';
+  $('spBtn').textContent=spOn()?'Disconnect':'Connect';
+}
+let spToastT=null;
+function spToast(t){let el=$('spToast');if(!el){el=document.createElement('div');el.id='spToast';el.className='toast';el.setAttribute('role','status');document.body.appendChild(el)}
+  el.textContent=t;el.hidden=false;clearTimeout(spToastT);spToastT=setTimeout(()=>{el.hidden=true},3500)}
+
 function refreshAll(){renderLog();renderPlan();if(!$('pProgress').hidden)renderProgress()}
 function openEdit(i){
   const L=store.get('rc-log')||[];const x=L[i];if(!x)return;
@@ -1181,7 +1313,7 @@ function build(B){
     const rs=r<b.rounds?b.rest:b.gap;if(rs>0)L.push({k:'rest',s:rs,idx})}});
   return L;
 }
-function show(id){['setup','run','done'].forEach(x=>$(x).hidden=x!==id)}
+function show(id){['setup','run','done'].forEach(x=>$(x).hidden=x!==id);if(id==='run'){renderMp();spStartPolling()}else spStopPolling()}
 function start(mode){
   if(mode!=='plan'&&mode!=='timer')mode=R.mode||'timer';
   if(mode==='plan'&&!P)mode='timer';
@@ -1277,7 +1409,10 @@ function togglePause(){
 }
 $('pause').addEventListener('click',e=>{e.stopPropagation();togglePause()});
 // gloves-on: tap anywhere on the run screen to pause / resume
-$('run').addEventListener('click',e=>{if(e.target.closest('button'))return;togglePause()});
+$('run').addEventListener('click',e=>{if(e.target.closest('button')||e.target.closest('.mp'))return;togglePause()});
+$('mpPrev').addEventListener('click',()=>spCmd('prev'));$('mpNext').addEventListener('click',()=>spCmd('next'));
+$('mpPlay').addEventListener('click',()=>spCmd('toggle'));$('mpList').addEventListener('click',openPlaylists);
+$('spBtn').addEventListener('click',()=>spOn()?spDisconnect():spConnect());
 // skip and stop need a short hold, so a glove brushing the screen can't trigger them
 function holdButton(btn,action){
   let t=null;const cancel=()=>{clearTimeout(t);t=null;btn.classList.remove('holding')};
@@ -1295,6 +1430,7 @@ $('tourLink').addEventListener('click',openTour);
 $('fbBtn').addEventListener('click',openFeedback);
 $('fbDone').addEventListener('click',openFeedback);
 if(profile()&&profile().level&&!store.get('rc-tour'))setTimeout(openTour,400);
+spHandleRedirect();renderSpRow();
 renderLog();renderPlan();render();tab(P||!profile()?'today':'timer');
 })();
 </script>
