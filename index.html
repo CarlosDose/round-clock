@@ -37,8 +37,11 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 .brand h1{font-family:var(--display);font-weight:900;font-size:2.4rem;letter-spacing:.02em;text-transform:uppercase;margin:0;line-height:1}
 .brand h1 span{color:var(--red)}
 .brand small{color:var(--muted);font-size:.85rem}
+.brand{align-items:center;flex-wrap:wrap;min-width:0}
+.brand h1{font-size:clamp(1.5rem,7.6vw,2.4rem)!important;white-space:nowrap}
+.fb-btn{background:none;border:1px solid var(--amber);color:var(--amber);border-radius:999px;padding:7px 11px;font-weight:700;font-size:.8rem;letter-spacing:.04em;flex:none}
 .tabs{display:grid;grid-template-columns:repeat(4,1fr);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px;gap:4px}
-.tabs button{background:none;border:0;border-radius:7px;padding:12px;font-family:var(--display);font-weight:800;font-size:clamp(.82rem,3.6vw,1rem);text-transform:uppercase;letter-spacing:.02em;color:var(--muted);padding:12px 2px;min-width:0}
+.tabs button{background:none;border:0;border-radius:7px;padding:12px;font-family:var(--display);font-weight:800;font-size:clamp(.7rem,3.3vw,1rem);text-transform:uppercase;letter-spacing:.02em;color:var(--muted);padding:12px 2px;min-width:0}
 .tabs button[aria-selected="true"]{background:var(--text);color:var(--ground)}
 .panel{display:flex;flex-direction:column;gap:20px}
 .today{display:flex;flex-direction:column;gap:16px}
@@ -256,7 +259,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 
 <!-- SETUP -->
 <main id="setup">
-  <div class="brand"><h1>Round<span>.</span>Clock</h1><small>Set it. Glove up. Go.</small></div>
+  <div class="brand"><h1>Round<span>.</span>Clock</h1><button type="button" class="fb-btn" id="fbBtn">Feedback</button></div>
 
   <nav class="tabs" role="tablist" aria-label="Pages">
     <button role="tab" id="tabToday" aria-controls="pToday">Today</button>
@@ -325,7 +328,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
     <div id="progBody" class="prog"></div>
   </div>
   <button type="button" class="link" id="tourLink">How Round Clock works</button>
-  <p class="ver">Round Clock · updated 13 Oct 2026 · faster coach</p>
+  <p class="ver">Round Clock · updated 13 Oct 2026 · feedback</p>
 </main>
 
 <!-- RUN -->
@@ -370,6 +373,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
     <button type="button" class="link" id="skipCheck">Skip for today</button>
   </form>
   <p class="saved" id="saved" hidden>Check-in saved.</p>
+  <button type="button" class="link" id="fbDone">Something about the app? Send feedback</button>
   <div class="lvl" id="lvl" hidden><div class="lvl-tag">Level up</div><div class="lvl-text" id="lvlText"></div><p id="lvlDetail"></p><p>Your next session is a step harder. You earned it.</p></div>
   <button class="go" id="again">Go again</button>
   <button class="ghost" id="back">Change settings</button>
@@ -901,7 +905,7 @@ function openDrill(id){
 }
 
 /* ---------- backup ---------- */
-const BK_KEYS=['rc-log','rc-profile','rc-settings','rc-today','rc-cfocus','rc-tour'];
+const BK_KEYS=['rc-log','rc-profile','rc-settings','rc-today','rc-cfocus','rc-tour','rc-feedback'];
 function backupCode(){const data={};BK_KEYS.forEach(k=>{const v=store.get(k);if(v!=null)data[k]=v});
   return 'RC1.'+btoa(unescape(encodeURIComponent(JSON.stringify({app:'round-clock',t:Date.now(),data}))))}
 function readBackup(code){try{code=String(code||'').trim().replace(/\s+/g,'');if(code.startsWith('RC1.'))code=code.slice(4);
@@ -938,6 +942,41 @@ function openRestore(showCode){
   }
   const x=el('button','link','Close');x.type='button';x.addEventListener('click',()=>sh.remove());card.appendChild(x);
   sh.appendChild(card);sh.addEventListener('click',e=>{if(e.target===sh)sh.remove()});document.body.appendChild(sh);
+}
+/* ---------- feedback ---------- */
+const APP_VER=(document.querySelector('.ver')||{}).textContent||'Round Clock';
+function feedbackText(fb){
+  const pr=profile()||{};const ua=navigator.userAgent;
+  const dev=/iPhone/.test(ua)?'iPhone':/iPad/.test(ua)?'iPad':/Android/.test(ua)?'Android':/Mac/.test(ua)?'Mac':'Other';
+  const lv=LEVELS[pr.level]?pr.level:'not set';
+  return `Round Clock feedback\nType: ${fb.type}\n${fb.name?'From: '+fb.name+'\n':''}\n${fb.text}\n\n(${APP_VER.replace('Round Clock · ','')} · level: ${lv} · ${dev} · ${new Date(fb.t).toLocaleDateString()})`;
+}
+function openFeedback(){
+  const el=(t,c,txt)=>{const e=document.createElement(t);if(c)e.className=c;if(txt!=null)e.textContent=txt;return e};
+  let sh=$('fbSheet');if(sh)sh.remove();sh=el('div','sheet');sh.id='fbSheet';sh.setAttribute('role','dialog');sh.setAttribute('aria-label','Send feedback');
+  const card=el('div','sheet-card');const fb={type:'Idea',name:(store.get('rc-fbname')||''),text:''};
+  card.append(el('div','eq-q','Send feedback'),el('p','eq-note','Something broken, annoying or missing? Every message helps make the app better.'));
+  card.appendChild(el('div','t-label','What is it about?'));
+  const ch=el('div','chips');['Bug','Idea','Coach plan','Voice & sounds','Design','Other'].forEach(t=>{const b=el('button',null,t);b.type='button';b.setAttribute('aria-pressed',fb.type===t);
+    b.addEventListener('click',()=>{fb.type=t;[...ch.children].forEach(x=>x.setAttribute('aria-pressed',x===b))});ch.appendChild(b)});
+  card.appendChild(ch);
+  const ta=el('textarea','edit-note');ta.rows=5;ta.placeholder='Tell us what happened, or what you wish the app did…';ta.setAttribute('aria-label','Your feedback');card.appendChild(ta);
+  const nm=el('input','edit-note');nm.type='text';nm.placeholder='Your name (optional)';nm.value=fb.name;nm.setAttribute('aria-label','Your name');card.appendChild(nm);
+  const msg=el('p','eq-note');
+  const send=el('button','go','Send feedback');
+  send.addEventListener('click',async()=>{
+    fb.text=ta.value.trim();fb.name=nm.value.trim();fb.t=Date.now();
+    if(!fb.text){msg.textContent='Write a few words first.';msg.style.color='var(--amber)';ta.focus();return}
+    store.set('rc-fbname',fb.name);
+    const all=store.get('rc-feedback')||[];all.unshift(fb);store.set('rc-feedback',all.slice(0,50));
+    const text=feedbackText(fb);
+    try{if(navigator.share){await navigator.share({title:'Round Clock feedback',text});msg.textContent='Thanks! Feedback shared.';msg.style.color='var(--green)';return}}catch(e){if(e&&e.name==='AbortError'){msg.textContent='Not sent. Tap Send again when you are ready.';return}}
+    try{await navigator.clipboard.writeText(text);msg.textContent='Copied! Paste it in a message to Carl.';msg.style.color='var(--green)'}
+    catch(e){ta.value=text;ta.select();msg.textContent='Copy the text above and send it to Carl.'}
+  });
+  card.append(send,msg,el('p','eq-note','Opens your share menu. Send it to Carl on WhatsApp, Messages or email.'));
+  const x=el('button','link','Close');x.type='button';x.addEventListener('click',()=>sh.remove());card.appendChild(x);
+  sh.appendChild(card);sh.addEventListener('click',e=>{if(e.target===sh)sh.remove()});document.body.appendChild(sh);setTimeout(()=>ta.focus(),60);
 }
 function refreshAll(){renderLog();renderPlan();if(!$('pProgress').hidden)renderProgress()}
 function openEdit(i){
@@ -1245,6 +1284,8 @@ $('noStop').addEventListener('click',()=>{$('confirm').hidden=true;$('ctrls').hi
 $('yesStop').addEventListener('click',()=>{const ph=R.list[R.i];finish(false)});
 
 $('tourLink').addEventListener('click',openTour);
+$('fbBtn').addEventListener('click',openFeedback);
+$('fbDone').addEventListener('click',openFeedback);
 if(profile()&&profile().level&&!store.get('rc-tour'))setTimeout(openTour,400);
 renderLog();renderPlan();render();tab(P||!profile()?'today':'timer');
 })();
