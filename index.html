@@ -184,13 +184,14 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){.lvl{animation:none}}
 .eqbox{border-color:var(--text)}
 .eq-q{font-family:var(--display);font-weight:800;font-size:1.7rem;line-height:1.05;text-transform:uppercase;letter-spacing:.02em}
-.eq-tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.eq-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .eq-tile{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:14px;border-radius:10px;border:2px solid var(--line);background:var(--ground);text-align:left;min-width:0}
-.eq-tile b{font-family:var(--display);font-weight:800;font-size:1.35rem;text-transform:uppercase;letter-spacing:.03em}
+.eq-tile b{font-family:var(--display);font-weight:800;font-size:clamp(1rem,4.6vw,1.3rem);line-height:1.05;text-transform:uppercase;letter-spacing:.03em}
 .eq-tile span{font-size:.9rem;color:var(--muted);font-weight:600}
 .eq-tile[aria-pressed="true"]{border-color:var(--green)}
 .eq-tile[aria-pressed="true"] span{color:var(--green)}
 .eq-tile[aria-pressed="false"] b{color:var(--muted);text-decoration:line-through}
+.eq-tile.eq-music[aria-pressed="false"] b{text-decoration:none}
 .eq-note{margin:0;font-size:.92rem;color:var(--muted);line-height:1.45}
 .sheet{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center;padding:16px}
 .sheet-card{width:100%;max-width:460px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 16px calc(20px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px;animation:lvlpop .3s ease-out;max-height:calc(100% - 8px);overflow-y:auto}
@@ -312,6 +313,8 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
       <div class="toggle"><input type="checkbox" id="combos" checked></div></div>
     <div class="row"><label for="voice">Say combos out loud<em>Also used in Today's plan</em></label>
       <div class="toggle"><input type="checkbox" id="voice" checked></div></div>
+    <div class="row"><label for="music">Playing music<em>Keeps Spotify playing. Bells mix on top. Silent switch off</em></label>
+      <div class="toggle"><input type="checkbox" id="music"></div></div>
     <div class="row"><label for="voicePick">Coach voice<em id="voiceNow">Pick one that sounds right</em></label>
       <div class="vsel"><select id="voicePick"><option value="">Coach Carl</option><option value="clip:ryan">Generated male</option><option value="clip:lessac">Generated female</option></select><button type="button" id="voiceTest">Test</button></div></div>
   </div>
@@ -328,7 +331,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
     <div id="progBody" class="prog"></div>
   </div>
   <button type="button" class="link" id="tourLink">How Round Clock works</button>
-  <p class="ver">Round Clock · updated 13 Oct 2026 · feedback</p>
+  <p class="ver">Round Clock · updated 13 Oct 2026 · music</p>
 </main>
 
 <!-- RUN -->
@@ -382,7 +385,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 <script>
 (function(){
 const LIM={rounds:[1,30],round:[15,600],rest:[0,300],prep:[0,30]};
-const S={rounds:6,round:180,rest:60,prep:10,warn:true,warnAt:'10',combos:true,voice:true,voiceName:''};
+const S={rounds:6,round:180,rest:60,prep:10,warn:true,warnAt:'10',combos:true,voice:true,voiceName:'',music:false};
 const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 Object.assign(S,store.get('rc-settings')||{});
 if(S.warn===false&&!(store.get('rc-settings')||{}).warnAt)S.warnAt='off';
@@ -393,7 +396,8 @@ const fmtS=s=>s<60?s+'s':fmt(s);
 function render(){
   $('v-rounds').textContent=S.rounds;$('v-round').textContent=fmt(S.round);
   $('v-rest').textContent=S.rest?fmt(S.rest):'None';$('v-prep').textContent=fmtS(S.prep);
-  document.querySelectorAll('#warnSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.w===S.warnAt));$('combos').checked=S.combos;$('voice').checked=S.voice;
+  document.querySelectorAll('#warnSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.w===S.warnAt));
+  $('music').checked=!!S.music;$('combos').checked=S.combos;$('voice').checked=S.voice;
   $('total').textContent=fmt(S.rounds*S.round+(S.rounds-1)*S.rest);
   document.querySelectorAll('[data-p]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.p===[S.rounds,S.round,S.rest].join(',')));
   store.set('rc-settings',S);
@@ -407,6 +411,7 @@ document.querySelectorAll('[data-p]').forEach(b=>b.addEventListener('click',()=>
 document.querySelectorAll('#warnSeg button').forEach(b=>b.addEventListener('click',()=>{S.warnAt=b.dataset.w;S.warn=S.warnAt!=='off';render()}));
 $('combos').addEventListener('change',e=>{S.combos=e.target.checked;render()});
 $('voice').addEventListener('change',e=>{S.voice=e.target.checked;render()});
+$('music').addEventListener('change',e=>{S.music=e.target.checked;render();if(R.on)mediaMode()});
 
 /* ---------- log ---------- */
 const sample=[{d:'Example',r:13,w:2280,kind:'plan'}];
@@ -464,11 +469,12 @@ function setEq(eq){store.set('rc-today',{d:new Date().toDateString(),eq})}
 const eqConfirmed=()=>{const t=store.get('rc-today');return !!(t&&t.d===new Date().toDateString())};
 function eqTiles(onChange){
   const eq=todayEq(),wrap=document.createElement('div');wrap.className='eq-tiles';
-  [['bag','Heavy bag'],['rope','Jump rope']].forEach(([k,l])=>{
-    const b=document.createElement('button');b.type='button';b.className='eq-tile';b.setAttribute('aria-pressed',!!eq[k]);
-    const n=document.createElement('b');n.textContent=l;const st=document.createElement('span');st.textContent=eq[k]?'✓ Using it':'Not today';
+  [['bag','Heavy bag'],['rope','Jump rope'],['music','Own music']].forEach(([k,l])=>{
+    const on=k==='music'?!!S.music:!!eq[k];
+    const b=document.createElement('button');b.type='button';b.className='eq-tile'+(k==='music'?' eq-music':'');b.setAttribute('aria-pressed',on);
+    const n=document.createElement('b');n.textContent=l;const st=document.createElement('span');st.textContent=on?(k==='music'?'✓ Keep playing':'✓ Using it'):(k==='music'?'Off':'Not today');
     b.append(n,st);
-    b.addEventListener('click',()=>{const e=todayEq();e[k]=!e[k];setEq(e);onChange()});
+    b.addEventListener('click',()=>{if(k==='music'){S.music=!S.music;render();if(R.on)mediaMode()}else{const e=todayEq();e[k]=!e[k];setEq(e)}onChange()});
     wrap.appendChild(b)});
   return wrap;
 }
@@ -676,7 +682,7 @@ function renderPlan(){
   const q=el('div','t-block eqbox');
   q.append(el('div','t-label','Before you start'),el('div','eq-q','What do you have today?'));
   q.appendChild(eqTiles(renderPlan));
-  q.appendChild(el('p','eq-note','Your session changes to fit. No bag means shadowboxing or footwork instead. No rope means skipping on the spot.'));
+  q.appendChild(el('p','eq-note','Your session changes to fit. No bag means shadowboxing or footwork instead. No rope means skipping on the spot. Own music keeps Spotify playing under the bells (silent switch off).'));
   const m=el('div','t-main',`${Math.round(blocksTime(P.blocks)/60)} min`);
   m.appendChild(el('small',null,`Full session · ${blocksRounds(P.blocks)} rounds`));
   const list=el('ol','t-list');
@@ -1120,6 +1126,8 @@ function saveLog(){
 let ac=null,keep=null;
 // Treat our sounds as media playback, so iPhones still play them with the silent switch on.
 function mediaMode(){
+  // Playing music: mix our sounds on top of Spotify etc. so the music never stops (silent switch must be off)
+  if(S.music){try{if(navigator.audioSession)navigator.audioSession.type='ambient'}catch(e){}try{keep&&keep.pause()}catch(e){}return}
   try{if(navigator.audioSession)navigator.audioSession.type='playback'}catch(e){}
   try{
     if(!keep){
